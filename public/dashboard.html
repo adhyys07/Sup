@@ -271,7 +271,8 @@
         <div class="welcome-section">
             <h2>Welcome back, <span id="welcomeName">User</span>!</h2>
             <div class="action-buttons">
-                <button class="btn-primary" onclick="openCreateMeetingModal()">+ New Meeting</button>
+                <button class="btn-primary" onclick="instantMeeting()">Instant Meeting</button>
+                <button class="btn-primary" onclick="openCreateMeetingModal()">Schedule Meeting</button>
                 <button class="btn-primary" onclick="openJoinMeetingModal()">Join Meeting</button>
             </div>
         </div>
@@ -418,22 +419,13 @@
             joinMeetingByCode(code);
         }
 
+        function instantMeeting() {
+            const code = Math.random().toString(36).substring(2, 11).toUpperCase();
+            window.location.href = `/meeting.html?room=${code}`;
+        }
+
         async function joinMeetingByCode(code) {
-            try {
-                const response = await fetch(`/api/meetings/${code}/join`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-
-                if (!response.ok) {
-                    alert('Meeting not found');
-                    return;
-                }
-
-                window.location.href = `/meeting.html?room=${code}`;
-            } catch (err) {
-                alert('Error joining meeting: ' + err.message);
-            }
+            window.location.href = `/meeting.html?room=${code}`;
         }
 
         function openCreateMeetingModal() {

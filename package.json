@@ -22,6 +22,9 @@
     "url": "https://github.com/adhyys07/Sup/issues"
   },
   "homepage": "https://github.com/adhyys07/Sup#readme",
+  "engines": {
+    "node": "18.x"
+  },
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",

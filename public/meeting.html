@@ -209,9 +209,152 @@
                 height: 200px;
             }
         }
+
+        /* Lobby / Pre-join screen */
+        .lobby-overlay {
+            position: fixed;
+            inset: 0;
+            background: #1a1a1a;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .lobby-overlay.hidden { display: none; }
+        .lobby-card {
+            background: #222;
+            border-radius: 16px;
+            padding: 30px;
+            width: 520px;
+            max-width: 95vw;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        .lobby-card h2 {
+            color: white;
+            font-size: 22px;
+        }
+        .lobby-preview {
+            width: 100%;
+            aspect-ratio: 16/9;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+        }
+        .lobby-preview video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+        }
+        .lobby-preview .cam-off-placeholder {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            font-size: 48px;
+        }
+        .lobby-controls {
+            display: flex;
+            gap: 16px;
+        }
+        .lobby-controls button {
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 20px;
+            transition: background 0.2s;
+        }
+        .lobby-controls .ctrl-on { background: #333; color: white; }
+        .lobby-controls .ctrl-off { background: #d32f2f; color: white; }
+        .lobby-info {
+            color: #aaa;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .lobby-info .dot { width: 8px; height: 8px; border-radius: 50%; background: #4caf50; }
+        .btn-join-now {
+            background: #667eea;
+            color: white;
+            font-size: 16px;
+            padding: 14px 48px;
+            border-radius: 30px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        .btn-join-now:hover { background: #5568d3; }
+        .btn-back {
+            background: none;
+            border: 1px solid #555;
+            color: #aaa;
+            padding: 8px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .btn-back:hover { border-color: #888; color: white; }
+
+        /* In-call mic/cam toggle bar */
+        .call-controls {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            padding: 12px 0;
+            background: #222;
+            border-top: 1px solid #333;
+        }
+        .call-controls button {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 18px;
+            transition: background 0.2s;
+        }
+        .call-controls .ctrl-on { background: #333; color: white; }
+        .call-controls .ctrl-off { background: #d32f2f; color: white; }
     </style>
 </head>
 <body>
+    <!-- Pre-join Lobby -->
+    <div class="lobby-overlay" id="lobbyOverlay">
+        <div class="lobby-card">
+            <h2>Ready to join?</h2>
+            <div class="lobby-preview">
+                <video id="lobbyVideo" autoplay muted playsinline></video>
+                <div class="cam-off-placeholder hidden" id="camOffPlaceholder">📷</div>
+            </div>
+            <div class="lobby-controls">
+                <button id="lobbyMicBtn" class="ctrl-on" onclick="toggleLobbyMic()" title="Toggle microphone">🎤</button>
+                <button id="lobbyCamBtn" class="ctrl-on" onclick="toggleLobbyCam()" title="Toggle camera">📷</button>
+            </div>
+            <div class="lobby-info" id="lobbyInfo">
+                <span class="dot"></span>
+                <span id="lobbyParticipantText">Checking room...</span>
+            </div>
+            <button class="btn-join-now" onclick="joinCall()">Join now</button>
+            <button class="btn-back" onclick="window.location.href='/dashboard.html'">Back to dashboard</button>
+        </div>
+    </div>
+
     <div class="header">
         <div class="header-left">
             <h1>Sup! Meeting</h1>
@@ -244,6 +387,12 @@
         </div>
     </div>
 
+    <!-- In-call controls -->
+    <div class="call-controls" id="callControls">
+        <button id="callMicBtn" class="ctrl-on" onclick="toggleCallMic()" title="Toggle microphone">🎤</button>
+        <button id="callCamBtn" class="ctrl-on" onclick="toggleCallCam()" title="Toggle camera">📷</button>
+    </div>
+
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const params = new URLSearchParams(window.location.search);
@@ -260,6 +409,9 @@
         let localStream;
         let peerConnections = {};
         let userNames = {};
+        let micEnabled = true;
+        let camEnabled = true;
+        let currentUser = null;
 
         const localVideo = document.getElementById('localVideo');
         const videosContainer = document.getElementById('videosContainer');
@@ -273,39 +425,115 @@
             return await response.json();
         }
 
-        // Initialize
-        async function init() {
+        // ============ LOBBY ============
+        async function initLobby() {
             try {
-                const user = await getCurrentUser();
-                userNames['local'] = user.name;
+                currentUser = await getCurrentUser();
+                userNames['local'] = currentUser.name;
 
-                // Register meeting join
-                await fetch(`/api/meetings/${room}/join`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-
-                // Get local stream
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: true, 
-                    audio: true 
-                });
+                // Get camera preview for lobby
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 localStream = stream;
-                localVideo.srcObject = stream;
+                document.getElementById('lobbyVideo').srcObject = stream;
 
-                // Join meeting
-                socket.emit('join-room', room, user.id);
-
-                // Load chat messages
-                await loadChatMessages();
+                // Check how many people are in the room
+                try {
+                    const res = await fetch(`/api/rooms/${room}/participants`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await res.json();
+                    const text = data.count === 0
+                        ? 'No one else is here yet'
+                        : `${data.count} person${data.count > 1 ? 's' : ''} in this meeting`;
+                    document.getElementById('lobbyParticipantText').textContent = text;
+                } catch {
+                    document.getElementById('lobbyParticipantText').textContent = 'Ready to connect';
+                }
             } catch (error) {
-                console.error('Error initializing:', error);
-                alert('Please allow access to camera and microphone');
+                console.error('Lobby init error:', error);
+                document.getElementById('lobbyParticipantText').textContent = 'Camera / mic unavailable';
             }
         }
 
-        socket.on("user-joined", async (id) => {
-            console.log("User joined:", id);
+        function toggleLobbyMic() {
+            if (!localStream) return;
+            micEnabled = !micEnabled;
+            localStream.getAudioTracks().forEach(t => t.enabled = micEnabled);
+            const btn = document.getElementById('lobbyMicBtn');
+            btn.className = micEnabled ? 'ctrl-on' : 'ctrl-off';
+            btn.textContent = micEnabled ? '🎤' : '🔇';
+        }
+
+        function toggleLobbyCam() {
+            if (!localStream) return;
+            camEnabled = !camEnabled;
+            localStream.getVideoTracks().forEach(t => t.enabled = camEnabled);
+            const btn = document.getElementById('lobbyCamBtn');
+            btn.className = camEnabled ? 'ctrl-on' : 'ctrl-off';
+            btn.textContent = camEnabled ? '📷' : '🚫';
+
+            document.getElementById('lobbyVideo').style.display = camEnabled ? '' : 'none';
+            document.getElementById('camOffPlaceholder').classList.toggle('hidden', camEnabled);
+        }
+
+        // ============ JOIN CALL ============
+        async function joinCall() {
+            // Hide lobby, show meeting
+            document.getElementById('lobbyOverlay').classList.add('hidden');
+
+            // Sync in-call buttons with lobby state
+            syncCallControls();
+
+            try {
+                // Register join in DB (works for scheduled meetings, ignored for disposable)
+                try {
+                    await fetch(`/api/meetings/${room}/join`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                } catch (e) { /* disposable meeting — no DB record */ }
+
+                // Assign stream to local video
+                localVideo.srcObject = localStream;
+
+                // Join socket room
+                socket.emit('join-room', room, currentUser.id, currentUser.name);
+
+                // Load persisted chat messages
+                try { await loadChatMessages(); } catch (e) { /* no persisted messages */ }
+            } catch (error) {
+                console.error('Error joining call:', error);
+            }
+        }
+
+        // ============ IN-CALL CONTROLS ============
+        function syncCallControls() {
+            const micBtn = document.getElementById('callMicBtn');
+            const camBtn = document.getElementById('callCamBtn');
+            micBtn.className = micEnabled ? 'ctrl-on' : 'ctrl-off';
+            micBtn.textContent = micEnabled ? '🎤' : '🔇';
+            camBtn.className = camEnabled ? 'ctrl-on' : 'ctrl-off';
+            camBtn.textContent = camEnabled ? '📷' : '🚫';
+        }
+
+        function toggleCallMic() {
+            if (!localStream) return;
+            micEnabled = !micEnabled;
+            localStream.getAudioTracks().forEach(t => t.enabled = micEnabled);
+            syncCallControls();
+        }
+
+        function toggleCallCam() {
+            if (!localStream) return;
+            camEnabled = !camEnabled;
+            localStream.getVideoTracks().forEach(t => t.enabled = camEnabled);
+            syncCallControls();
+        }
+
+        // ============ WEBRTC ============
+        socket.on("user-joined", async (id, name) => {
+            console.log("User joined:", id, name);
+            if (name) userNames[id] = name;
             const pc = createPeerConnection(id);
             peerConnections[id] = pc;
             
@@ -476,7 +704,7 @@
             window.location.href = '/dashboard.html';
         }
 
-        window.addEventListener('load', init);
+        window.addEventListener('load', initLobby);
     </script>
 </body>
 </html>

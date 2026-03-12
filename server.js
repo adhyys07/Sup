@@ -353,14 +353,38 @@ app.get('/api/meetings/:code/messages', verifyToken, async (req, res) => {
     }
 });
 
+// ============ ROOM INFO ============
+app.get('/api/rooms/:code/participants', verifyToken, (req, res) => {
+    const roomCode = req.params.code;
+    const room = io.sockets.adapter.rooms.get(roomCode);
+    const count = room ? room.size : 0;
+
+    const participants = [];
+    if (room) {
+        for (const socketId of room) {
+            const userData = connectedUsers[socketId];
+            if (userData) {
+                participants.push({ socketId, userId: userData.userId, name: userData.name });
+            }
+        }
+    }
+
+    res.json({ count, participants });
+});
+
+// Shareable join link
+app.get('/join/:code', (req, res) => {
+    res.redirect(`/meeting.html?room=${encodeURIComponent(req.params.code)}`);
+});
+
 // ============ SOCKET.IO EVENTS ============
 const connectedUsers = {};
 
 io.on('connection', (socket) => {
-    socket.on('join-room', (room, userId) => {
+    socket.on('join-room', (room, userId, userName) => {
         socket.join(room);
-        connectedUsers[socket.id] = { userId, room };
-        socket.to(room).emit('user-joined', socket.id);
+        connectedUsers[socket.id] = { userId, room, name: userName || 'User' };
+        socket.to(room).emit('user-joined', socket.id, userName);
     });
 
     socket.on('signal', (data) => {
