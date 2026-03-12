@@ -376,12 +376,10 @@ app.get('/api/rooms/:code/participants', verifyToken, (req, res) => {
     res.json({ count, participants });
 });
 
-// Shareable join link
 app.get('/join/:code', (req, res) => {
     res.redirect(`/meeting.html?room=${encodeURIComponent(req.params.code)}`);
 });
 
-// ============ SOCKET.IO EVENTS ============
 const connectedUsers = {};
 
 io.on('connection', (socket) => {
@@ -404,6 +402,13 @@ io.on('connection', (socket) => {
             userId: connectedUsers[socket.id]?.userId,
             message: data.message,
             timestamp: new Date()
+        });
+    });
+
+    socket.on('camera-state', (data) => {
+        socket.to(data.room).emit('camera-state', {
+            from: socket.id,
+            isOff: !!data.isOff
         });
     });
 
