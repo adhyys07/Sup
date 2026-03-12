@@ -21,8 +21,11 @@ const io = new Server(server, {
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.set('trust proxy', 1);
 app.use(passport.initialize());
 app.use(express.static('public'));
+
+const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this';
 
@@ -52,8 +55,9 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
     passport.use(new GoogleStrategy({
         clientID: process.env.GOOGLE_CLIENT_ID,
         clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-        callbackURL: '/auth/google/callback',
-        scope: ['profile', 'email']
+        callbackURL: `${BASE_URL}/auth/google/callback`,
+        scope: ['profile', 'email'],
+        proxy: true
     }, async (accessToken, refreshToken, profile, done) => {
         try {
             const user = await findOrCreateOAuthUser(profile, 'google');
@@ -68,7 +72,7 @@ if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
     passport.use(new GitHubStrategy({
         clientID: process.env.GITHUB_CLIENT_ID,
         clientSecret: process.env.GITHUB_CLIENT_SECRET,
-        callbackURL: '/auth/github/callback',
+        callbackURL: `${BASE_URL}/auth/github/callback`,
         scope: ['user:email']
     }, async (accessToken, refreshToken, profile, done) => {
         try {
