@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Sup!</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+        }
+        .navbar {
+            background: white;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        .navbar-left {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+            flex: 1;
+        }
+        h1 {
+            color: #667eea;
+            font-size: 24px;
+        }
+        nav a {
+            color: #666;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+        nav a:hover {
+            color: #667eea;
+        }
+        .navbar-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #667eea;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+        }
+        .user-name {
+            color: #333;
+            font-weight: 500;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        .btn-logout {
+            background: #d32f2f;
+            color: white;
+        }
+        .btn-logout:hover {
+            background: #c62828;
+        }
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+        .welcome-section {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        .welcome-section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .action-buttons button {
+            padding: 12px 24px;
+            font-size: 16px;
+        }
+        .meetings-section {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        .meetings-section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+        .meetings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+        }
+        .meeting-card {
+            background: #f9f9f9;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            transition: all 0.3s;
+        }
+        .meeting-card:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+        .meeting-title {
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        .meeting-code {
+            color: #666;
+            font-size: 12px;
+            background: #f0f0f0;
+            padding: 8px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-family: monospace;
+            word-break: break-all;
+        }
+        .meeting-host {
+            color: #999;
+            font-size: 12px;
+            margin-bottom: 15px;
+        }
+        .card-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        .card-buttons button {
+            flex: 1;
+            padding: 8px;
+            font-size: 14px;
+        }
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 400px;
+            width: 90%;
+        }
+        .modal-content h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .modal-buttons button {
+            flex: 1;
+            padding: 10px;
+        }
+        .btn-cancel {
+            background: #f0f0f0;
+            color: #333;
+        }
+        .btn-cancel:hover {
+            background: #e0e0e0;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <div class="navbar-left">
+            <h1>Sup!</h1>
+            <nav>
+                <a href="#" onclick="goToDashboard()">Dashboard</a>
+                <a href="#" onclick="goToProfile()">Profile</a>
+            </nav>
+        </div>
+        <div class="navbar-right">
+            <div class="user-info">
+                <div class="avatar" id="userAvatar">U</div>
+                <div class="user-name" id="userName">User</div>
+            </div>
+            <button class="btn-logout" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="welcome-section">
+            <h2>Welcome back, <span id="welcomeName">User</span>!</h2>
+            <div class="action-buttons">
+                <button class="btn-primary" onclick="openCreateMeetingModal()">+ New Meeting</button>
+                <button class="btn-primary" onclick="openJoinMeetingModal()">Join Meeting</button>
+            </div>
+        </div>
+
+        <div class="meetings-section">
+            <h2>Your Meetings</h2>
+            <div class="meetings-grid" id="meetingsGrid">
+                <div class="empty-state">Loading meetings...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Meeting Modal -->
+    <div class="modal" id="createMeetingModal">
+        <div class="modal-content">
+            <h2>Create New Meeting</h2>
+            <div class="form-group">
+                <label>Meeting Title</label>
+                <input type="text" id="meetingTitle" placeholder="Team Standup">
+            </div>
+            <div class="form-group">
+                <label>Scheduled Time (Optional)</label>
+                <input type="datetime-local" id="meetingTime">
+            </div>
+            <div class="modal-buttons">
+                <button class="btn-cancel" onclick="closeModal('createMeetingModal')">Cancel</button>
+                <button class="btn-primary" onclick="createMeeting()">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Join Meeting Modal -->
+    <div class="modal" id="joinMeetingModal">
+        <div class="modal-content">
+            <h2>Join Meeting</h2>
+            <div class="form-group">
+                <label>Meeting Code</label>
+                <input type="text" id="joinMeetingCode" placeholder="ABC123456" maxlength="9">
+            </div>
+            <div class="modal-buttons">
+                <button class="btn-cancel" onclick="closeModal('joinMeetingModal')">Cancel</button>
+                <button class="btn-primary" onclick="joinMeeting()">Join</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/';
+        }
+
+        let currentUser = null;
+        let userMeetings = [];
+
+        // Initialize dashboard
+        async function initDashboard() {
+            await fetchUserProfile();
+            await fetchMeetings();
+        }
+
+        async function fetchUserProfile() {
+            try {
+                const response = await fetch('/api/user/profile', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const user = await response.json();
+                currentUser = user;
+
+                document.getElementById('userName').textContent = user.name;
+                document.getElementById('welcomeName').textContent = user.name;
+                document.getElementById('userAvatar').textContent = user.name[0].toUpperCase();
+            } catch (err) {
+                console.error('Error fetching profile:', err);
+            }
+        }
+
+        async function fetchMeetings() {
+            try {
+                const response = await fetch('/api/meetings', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                userMeetings = await response.json();
+                renderMeetings();
+            } catch (err) {
+                console.error('Error fetching meetings:', err);
+            }
+        }
+
+        function renderMeetings() {
+            const grid = document.getElementById('meetingsGrid');
+            
+            if (userMeetings.length === 0) {
+                grid.innerHTML = '<div class="empty-state">No meetings yet. Create one to get started!</div>';
+                return;
+            }
+
+            grid.innerHTML = userMeetings.map(meeting => `
+                <div class="meeting-card">
+                    <div class="meeting-title">${meeting.title || 'Unnamed Meeting'}</div>
+                    <div class="meeting-code">${meeting.meeting_code}</div>
+                    <div class="meeting-host">Host: ${meeting.host_name}</div>
+                    <div class="card-buttons">
+                        <button class="btn-primary" onclick="joinMeetingByCode('${meeting.meeting_code}')">Join</button>
+                        <button class="btn-secondary" onclick="copyToClipboard('${meeting.meeting_code}')">Copy Code</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function createMeeting() {
+            const title = document.getElementById('meetingTitle').value;
+            const time = document.getElementById('meetingTime').value;
+
+            try {
+                const response = await fetch('/api/meetings', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        title: title || 'Meeting',
+                        scheduledTime: time || null
+                    })
+                });
+
+                const meeting = await response.json();
+                closeModal('createMeetingModal');
+                document.getElementById('meetingTitle').value = '';
+                document.getElementById('meetingTime').value = '';
+                window.location.href = `/meeting.html?room=${meeting.meeting_code}`;
+            } catch (err) {
+                alert('Error creating meeting: ' + err.message);
+            }
+        }
+
+        async function joinMeeting() {
+            const code = document.getElementById('joinMeetingCode').value.trim().toUpperCase();
+            if (!code) {
+                alert('Please enter a meeting code');
+                return;
+            }
+            joinMeetingByCode(code);
+        }
+
+        async function joinMeetingByCode(code) {
+            try {
+                const response = await fetch(`/api/meetings/${code}/join`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!response.ok) {
+                    alert('Meeting not found');
+                    return;
+                }
+
+                window.location.href = `/meeting.html?room=${code}`;
+            } catch (err) {
+                alert('Error joining meeting: ' + err.message);
+            }
+        }
+
+        function openCreateMeetingModal() {
+            document.getElementById('createMeetingModal').classList.add('active');
+        }
+
+        function openJoinMeetingModal() {
+            document.getElementById('joinMeetingModal').classList.add('active');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                alert('Meeting code copied!');
+            });
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            window.location.href = '/';
+        }
+
+        function goToDashboard() {
+            window.location.href = '/dashboard.html';
+        }
+
+        function goToProfile() {
+            window.location.href = '/profile.html';
+        }
+
+        // Initialize on load
+        window.addEventListener('load', initDashboard);
+    </script>
+</body>
+</html>

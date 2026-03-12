@@ -1,10 +1,16 @@
-const express = require('express');
-const http = require('http');
-const { Server } = require("socket.io");
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
-const pool = require('./db');
-const cors = require('cors');
+import express from 'express';
+import http from 'http';
+import { Server } from 'socket.io';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
+import cors from 'cors';
+import passport from 'passport';
+import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
+import { Strategy as GitHubStrategy } from 'passport-github2';
+import 'dotenv/config';
+import { db } from './db.js';
+import { users, meetings, meetingParticipants, messages } from './schema.js';
+import { eq, or, and, inArray } from 'drizzle-orm';
 
 const app = express();
 const server = http.createServer(app);
@@ -15,9 +21,85 @@ const io = new Server(server, {
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use(passport.initialize());
 app.use(express.static('public'));
 
-const JWT_SECRET = 'your-secret-key-change-this';
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this';
+
+// ============ PASSPORT CONFIG ============
+async function findOrCreateOAuthUser(profile, provider) {
+    const email = profile.emails?.[0]?.value;
+    if (!email) throw new Error('No email from provider');
+
+    const existing = await db.select().from(users).where(eq(users.email, email));
+
+    if (existing.length > 0) {
+        return existing[0];
+    }
+
+    const result = await db.insert(users).values({
+        email,
+        name: profile.displayName || email,
+        avatar: profile.photos?.[0]?.value || null,
+        authProvider: provider,
+        authProviderId: profile.id
+    }).returning();
+
+    return result[0];
+}
+
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+    passport.use(new GoogleStrategy({
+        clientID: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        callbackURL: '/auth/google/callback',
+        scope: ['profile', 'email']
+    }, async (accessToken, refreshToken, profile, done) => {
+        try {
+            const user = await findOrCreateOAuthUser(profile, 'google');
+            done(null, user);
+        } catch (err) {
+            done(err, null);
+        }
+    }));
+}
+
+if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
+    passport.use(new GitHubStrategy({
+        clientID: process.env.GITHUB_CLIENT_ID,
+        clientSecret: process.env.GITHUB_CLIENT_SECRET,
+        callbackURL: '/auth/github/callback',
+        scope: ['user:email']
+    }, async (accessToken, refreshToken, profile, done) => {
+        try {
+            const user = await findOrCreateOAuthUser(profile, 'github');
+            done(null, user);
+        } catch (err) {
+            done(err, null);
+        }
+    }));
+}
+
+// ============ OAUTH ROUTES ============
+app.get('/auth/google', passport.authenticate('google', { session: false, scope: ['profile', 'email'] }));
+
+app.get('/auth/google/callback',
+    passport.authenticate('google', { session: false, failureRedirect: '/' }),
+    (req, res) => {
+        const token = jwt.sign({ id: req.user.id }, JWT_SECRET);
+        res.redirect(`/auth-success.html?token=${token}`);
+    }
+);
+
+app.get('/auth/github', passport.authenticate('github', { session: false, scope: ['user:email'] }));
+
+app.get('/auth/github/callback',
+    passport.authenticate('github', { session: false, failureRedirect: '/' }),
+    (req, res) => {
+        const token = jwt.sign({ id: req.user.id }, JWT_SECRET);
+        res.redirect(`/auth-success.html?token=${token}`);
+    }
+);
 
 // Middleware to verify JWT
 const verifyToken = (req, res, next) => {
@@ -39,13 +121,14 @@ app.post('/api/register', async (req, res) => {
         const { email, password, name } = req.body;
         const hashedPassword = await bcrypt.hash(password, 10);
         
-        const result = await pool.query(
-            'INSERT INTO users (email, password, name) VALUES ($1, $2, $3) RETURNING id, email, name',
-            [email, hashedPassword, name]
-        );
+        const result = await db.insert(users).values({
+            email,
+            password: hashedPassword,
+            name
+        }).returning({ id: users.id, email: users.email, name: users.name });
         
-        const token = jwt.sign({ id: result.rows[0].id }, JWT_SECRET);
-        res.json({ token, user: result.rows[0] });
+        const token = jwt.sign({ id: result[0].id }, JWT_SECRET);
+        res.json({ token, user: result[0] });
     } catch (err) {
         res.status(400).json({ error: err.message });
     }
@@ -54,13 +137,13 @@ app.post('/api/register', async (req, res) => {
 app.post('/api/login', async (req, res) => {
     try {
         const { email, password } = req.body;
-        const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+        const result = await db.select().from(users).where(eq(users.email, email));
         
-        if (result.rows.length === 0) {
+        if (result.length === 0) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
         
-        const user = result.rows[0];
+        const user = result[0];
         const validPassword = await bcrypt.compare(password, user.password);
         
         if (!validPassword) {
@@ -77,8 +160,15 @@ app.post('/api/login', async (req, res) => {
 // ============ USER PROFILE ROUTES ============
 app.get('/api/user/profile', verifyToken, async (req, res) => {
     try {
-        const result = await pool.query('SELECT id, email, name, bio, avatar FROM users WHERE id = $1', [req.userId]);
-        res.json(result.rows[0]);
+        const result = await db.select({
+            id: users.id,
+            email: users.email,
+            name: users.name,
+            bio: users.bio,
+            avatar: users.avatar
+        }).from(users).where(eq(users.id, req.userId));
+        
+        res.json(result[0]);
     } catch (err) {
         res.status(400).json({ error: err.message });
     }
@@ -87,11 +177,18 @@ app.get('/api/user/profile', verifyToken, async (req, res) => {
 app.put('/api/user/profile', verifyToken, async (req, res) => {
     try {
         const { name, bio, avatar } = req.body;
-        const result = await pool.query(
-            'UPDATE users SET name = $1, bio = $2, avatar = $3 WHERE id = $4 RETURNING id, email, name, bio, avatar',
-            [name, bio, avatar, req.userId]
-        );
-        res.json(result.rows[0]);
+        const result = await db.update(users)
+            .set({ name, bio, avatar, updatedAt: new Date() })
+            .where(eq(users.id, req.userId))
+            .returning({
+                id: users.id,
+                email: users.email,
+                name: users.name,
+                bio: users.bio,
+                avatar: users.avatar
+            });
+        
+        res.json(result[0]);
     } catch (err) {
         res.status(400).json({ error: err.message });
     }
@@ -103,12 +200,14 @@ app.post('/api/meetings', verifyToken, async (req, res) => {
         const { title, scheduledTime } = req.body;
         const meetingCode = Math.random().toString(36).substring(2, 11).toUpperCase();
         
-        const result = await pool.query(
-            'INSERT INTO meetings (host_id, title, meeting_code, scheduled_time) VALUES ($1, $2, $3, $4) RETURNING *',
-            [req.userId, title, meetingCode, scheduledTime]
-        );
+        const result = await db.insert(meetings).values({
+            hostId: req.userId,
+            title: title || 'Meeting',
+            meetingCode,
+            scheduledTime: scheduledTime ? new Date(scheduledTime) : null
+        }).returning();
         
-        res.json(result.rows[0]);
+        res.json(result[0]);
     } catch (err) {
         res.status(400).json({ error: err.message });
     }
@@ -116,11 +215,32 @@ app.post('/api/meetings', verifyToken, async (req, res) => {
 
 app.get('/api/meetings', verifyToken, async (req, res) => {
     try {
-        const result = await pool.query(
-            'SELECT m.*, u.name as host_name FROM meetings m JOIN users u ON m.host_id = u.id WHERE m.host_id = $1 OR m.id IN (SELECT meeting_id FROM meeting_participants WHERE user_id = $1) ORDER BY m.created_at DESC',
-            [req.userId]
-        );
-        res.json(result.rows);
+        const result = await db.select({
+            id: meetings.id,
+            hostId: meetings.hostId,
+            title: meetings.title,
+            meetingCode: meetings.meetingCode,
+            scheduledTime: meetings.scheduledTime,
+            startedAt: meetings.startedAt,
+            endedAt: meetings.endedAt,
+            createdAt: meetings.createdAt,
+            hostName: users.name
+        })
+        .from(meetings)
+        .leftJoin(users, eq(meetings.hostId, users.id))
+        .where(
+            or(
+                eq(meetings.hostId, req.userId),
+                inArray(meetings.id, 
+                    db.select({ meetingId: meetingParticipants.meetingId })
+                        .from(meetingParticipants)
+                        .where(eq(meetingParticipants.userId, req.userId))
+                )
+            )
+        )
+        .orderBy(meetings.createdAt);
+        
+        res.json(result);
     } catch (err) {
         res.status(400).json({ error: err.message });
     }
@@ -128,16 +248,24 @@ app.get('/api/meetings', verifyToken, async (req, res) => {
 
 app.get('/api/meetings/:code', verifyToken, async (req, res) => {
     try {
-        const result = await pool.query(
-            'SELECT m.*, u.name as host_name FROM meetings m JOIN users u ON m.host_id = u.id WHERE m.meeting_code = $1',
-            [req.params.code]
-        );
+        const result = await db.select({
+            id: meetings.id,
+            hostId: meetings.hostId,
+            title: meetings.title,
+            meetingCode: meetings.meetingCode,
+            scheduledTime: meetings.scheduledTime,
+            createdAt: meetings.createdAt,
+            hostName: users.name
+        })
+        .from(meetings)
+        .leftJoin(users, eq(meetings.hostId, users.id))
+        .where(eq(meetings.meetingCode, req.params.code));
         
-        if (result.rows.length === 0) {
+        if (result.length === 0) {
             return res.status(404).json({ error: 'Meeting not found' });
         }
         
-        res.json(result.rows[0]);
+        res.json(result[0]);
     } catch (err) {
         res.status(400).json({ error: err.message });
     }
@@ -145,25 +273,29 @@ app.get('/api/meetings/:code', verifyToken, async (req, res) => {
 
 app.post('/api/meetings/:code/join', verifyToken, async (req, res) => {
     try {
-        const meetingResult = await pool.query('SELECT id FROM meetings WHERE meeting_code = $1', [req.params.code]);
+        const meetingResult = await db.select().from(meetings).where(eq(meetings.meetingCode, req.params.code));
         
-        if (meetingResult.rows.length === 0) {
+        if (meetingResult.length === 0) {
             return res.status(404).json({ error: 'Meeting not found' });
         }
         
-        const meetingId = meetingResult.rows[0].id;
+        const meetingId = meetingResult[0].id;
         
         // Check if already joined
-        const existingResult = await pool.query(
-            'SELECT * FROM meeting_participants WHERE meeting_id = $1 AND user_id = $2',
-            [meetingId, req.userId]
-        );
-        
-        if (existingResult.rows.length === 0) {
-            await pool.query(
-                'INSERT INTO meeting_participants (meeting_id, user_id) VALUES ($1, $2)',
-                [meetingId, req.userId]
+        const existingResult = await db.select()
+            .from(meetingParticipants)
+            .where(
+                and(
+                    eq(meetingParticipants.meetingId, meetingId),
+                    eq(meetingParticipants.userId, req.userId)
+                )
             );
+        
+        if (existingResult.length === 0) {
+            await db.insert(meetingParticipants).values({
+                meetingId,
+                userId: req.userId
+            });
         }
         
         res.json({ success: true });
@@ -176,18 +308,19 @@ app.post('/api/meetings/:code/join', verifyToken, async (req, res) => {
 app.post('/api/meetings/:code/messages', verifyToken, async (req, res) => {
     try {
         const { message } = req.body;
-        const meetingResult = await pool.query('SELECT id FROM meetings WHERE meeting_code = $1', [req.params.code]);
+        const meetingResult = await db.select().from(meetings).where(eq(meetings.meetingCode, req.params.code));
         
-        if (meetingResult.rows.length === 0) {
+        if (meetingResult.length === 0) {
             return res.status(404).json({ error: 'Meeting not found' });
         }
         
-        const result = await pool.query(
-            'INSERT INTO messages (meeting_id, user_id, message) VALUES ($1, $2, $3) RETURNING m.*, u.name FROM messages m JOIN users u ON m.user_id = u.id WHERE m.id = $4',
-            [meetingResult.rows[0].id, req.userId, message, result.rows[0].id]
-        );
+        await db.insert(messages).values({
+            meetingId: meetingResult[0].id,
+            userId: req.userId,
+            message
+        });
         
-        res.json(result.rows[0]);
+        res.json({ success: true });
     } catch (err) {
         res.status(400).json({ error: err.message });
     }
@@ -195,18 +328,26 @@ app.post('/api/meetings/:code/messages', verifyToken, async (req, res) => {
 
 app.get('/api/meetings/:code/messages', verifyToken, async (req, res) => {
     try {
-        const meetingResult = await pool.query('SELECT id FROM meetings WHERE meeting_code = $1', [req.params.code]);
+        const meetingResult = await db.select().from(meetings).where(eq(meetings.meetingCode, req.params.code));
         
-        if (meetingResult.rows.length === 0) {
+        if (meetingResult.length === 0) {
             return res.status(404).json({ error: 'Meeting not found' });
         }
         
-        const result = await pool.query(
-            'SELECT m.*, u.name FROM messages m JOIN users u ON m.user_id = u.id WHERE m.meeting_id = $1 ORDER BY m.created_at ASC',
-            [meetingResult.rows[0].id]
-        );
+        const result = await db.select({
+            id: messages.id,
+            meetingId: messages.meetingId,
+            userId: messages.userId,
+            message: messages.message,
+            name: users.name,
+            createdAt: messages.createdAt
+        })
+        .from(messages)
+        .leftJoin(users, eq(messages.userId, users.id))
+        .where(eq(messages.meetingId, meetingResult[0].id))
+        .orderBy(messages.createdAt);
         
-        res.json(result.rows);
+        res.json(result);
     } catch (err) {
         res.status(400).json({ error: err.message });
     }
@@ -247,6 +388,7 @@ io.on('connection', (socket) => {
     });
 });
 
-server.listen(3000, () => {
-    console.log('listening on *:3000');
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`listening on *:${PORT}`);
 });

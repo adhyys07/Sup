@@ -54,51 +54,159 @@
         .copy-btn:hover {
             color: white;
         }
-        .btn-leave {
-            background: #d32f2f;
-            color: white;
+        .header-right {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        button {
+            padding: 10px 15px;
             border: none;
-            padding: 10px 20px;
             border-radius: 4px;
             cursor: pointer;
             font-weight: 600;
             transition: background 0.3s;
         }
+        .btn-leave {
+            background: #d32f2f;
+            color: white;
+        }
         .btn-leave:hover {
             background: #c62828;
         }
-        .video-container {
+        .btn-toggle {
+            background: #667eea;
+            color: white;
+            padding: 8px 12px;
+            font-size: 14px;
+        }
+        .btn-toggle:hover {
+            background: #5568d3;
+        }
+        .main-content {
             flex: 1;
             display: flex;
-            padding: 20px;
             gap: 20px;
-            overflow: auto;
+            padding: 20px;
+            overflow: hidden;
         }
-        .video-wrapper {
+        .video-section {
             flex: 1;
             display: flex;
             flex-direction: column;
-            align-items: center;
             min-width: 0;
         }
-        video {
-            max-width: 100%;
-            max-height: 100%;
-            background-color: #000;
+        .videos-container {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            overflow: auto;
+        }
+        .video-wrapper {
+            background: #000;
             border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            min-height: 300px;
+        }
+        video {
+            width: 100%;
+            height: 100%;
             object-fit: cover;
         }
         .video-label {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .chat-section {
+            width: 300px;
+            background: #222;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            display: none;
+        }
+        .chat-section.active {
+            display: flex;
+        }
+        .chat-header {
+            background: #333;
+            padding: 15px;
+            border-bottom: 1px solid #444;
+            color: white;
+            font-weight: 600;
+        }
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .chat-message {
+            background: #333;
+            padding: 10px;
+            border-radius: 6px;
+            color: white;
+            font-size: 13px;
+        }
+        .message-user {
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 3px;
+        }
+        .message-time {
+            font-size: 11px;
             color: #999;
-            margin-top: 10px;
+            margin-top: 3px;
+        }
+        .chat-input {
+            padding: 10px;
+            border-top: 1px solid #444;
+            display: flex;
+            gap: 8px;
+        }
+        .chat-input input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #444;
+            border-radius: 4px;
+            background: #333;
+            color: white;
             font-size: 14px;
         }
+        .chat-input input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .chat-input button {
+            padding: 8px 12px;
+            background: #667eea;
+            color: white;
+            font-size: 13px;
+        }
+        .chat-input button:hover {
+            background: #5568d3;
+        }
         @media (max-width: 768px) {
-            .video-container {
+            .main-content {
                 flex-direction: column;
             }
-            .video-wrapper {
-                min-height: 300px;
+            .chat-section {
+                width: 100%;
+                height: 200px;
             }
         }
     </style>
@@ -110,54 +218,99 @@
             <div class="meeting-code" id="meetingCode"></div>
             <button class="copy-btn" onclick="copyMeetingCode()">Copy</button>
         </div>
-        <button class="btn-leave" onclick="leaveMeeting()">Leave</button>
+        <div class="header-right">
+            <button class="btn-toggle" onclick="toggleChat()">Chat</button>
+            <button class="btn-leave" onclick="leaveMeeting()">Leave</button>
+        </div>
     </div>
 
-    <div class="video-container">
-        <div class="video-wrapper">
-            <video id="localVideo" autoplay muted playsinline></video>
-            <p class="video-label">You</p>
+    <div class="main-content">
+        <div class="video-section">
+            <div class="videos-container" id="videosContainer">
+                <div class="video-wrapper">
+                    <video id="localVideo" autoplay muted playsinline></video>
+                    <div class="video-label">You (Local)</div>
+                </div>
+            </div>
         </div>
-        <div class="video-wrapper">
-            <video id="remoteVideo" autoplay playsinline></video>
-            <p class="video-label">Remote User</p>
+
+        <div class="chat-section" id="chatSection">
+            <div class="chat-header">Chat</div>
+            <div class="chat-messages" id="chatMessages"></div>
+            <div class="chat-input">
+                <input type="text" id="chatInput" placeholder="Type a message..." onkeypress="handleChatKeyPress(event)">
+                <button onclick="sendMessage()">Send</button>
+            </div>
         </div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
-        // Get room from URL parameter
         const params = new URLSearchParams(window.location.search);
         const room = params.get('room') || 'unknown-room';
         
-        // Display meeting code
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/';
+        }
+
         document.getElementById('meetingCode').textContent = room;
 
         const socket = io();
         let localStream;
-        let peerConnection;
+        let peerConnections = {};
+        let userNames = {};
 
         const localVideo = document.getElementById('localVideo');
-        const remoteVideo = document.getElementById('remoteVideo');
+        const videosContainer = document.getElementById('videosContainer');
+        const chatMessages = document.getElementById('chatMessages');
 
-        // Initialize local stream
-        navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-            .then(stream => {
+        // Fetch current user info
+        async function getCurrentUser() {
+            const response = await fetch('/api/user/profile', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            return await response.json();
+        }
+
+        // Initialize
+        async function init() {
+            try {
+                const user = await getCurrentUser();
+                userNames['local'] = user.name;
+
+                // Register meeting join
+                await fetch(`/api/meetings/${room}/join`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                // Get local stream
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: true, 
+                    audio: true 
+                });
                 localStream = stream;
                 localVideo.srcObject = stream;
-                socket.emit('join-room', room);
-            })
-            .catch(error => {
-                console.error('Error accessing media devices:', error);
+
+                // Join meeting
+                socket.emit('join-room', room, user.id);
+
+                // Load chat messages
+                await loadChatMessages();
+            } catch (error) {
+                console.error('Error initializing:', error);
                 alert('Please allow access to camera and microphone');
-            });
+            }
+        }
 
         socket.on("user-joined", async (id) => {
             console.log("User joined:", id);
-            peerConnection = createPeerConnection(id);
+            const pc = createPeerConnection(id);
+            peerConnections[id] = pc;
             
-            const offer = await peerConnection.createOffer();
-            await peerConnection.setLocalDescription(offer);
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
             
             socket.emit("signal", {
                 to: id,
@@ -166,29 +319,42 @@
         });
 
         socket.on("signal", async (data) => {
-            if (!peerConnection) {
-                peerConnection = createPeerConnection(data.from);
+            let pc = peerConnections[data.from];
+            
+            if (!pc) {
+                pc = createPeerConnection(data.from);
+                peerConnections[data.from] = pc;
             }
             
             if (data.signal.type === 'offer') {
-                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.signal));
-                
-                const answer = await peerConnection.createAnswer();
-                await peerConnection.setLocalDescription(answer);
+                await pc.setRemoteDescription(new RTCSessionDescription(data.signal));
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
 
                 socket.emit("signal", {
                     to: data.from,
                     signal: answer
                 });
-            }   
-
-            if (data.signal.type === 'answer') {
-                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.signal));
+            } else if (data.signal.type === 'answer') {
+                await pc.setRemoteDescription(new RTCSessionDescription(data.signal));
+            } else if (data.signal.candidate) {
+                await pc.addIceCandidate(new RTCIceCandidate(data.signal.candidate));
             }
+        });
 
-            if (data.signal.candidate) {
-                await peerConnection.addIceCandidate(new RTCIceCandidate(data.signal.candidate));
+        socket.on("user-left", (id) => {
+            if (peerConnections[id]) {
+                peerConnections[id].close();
+                delete peerConnections[id];
             }
+            const videoElement = document.getElementById(`video-${id}`);
+            if (videoElement) {
+                videoElement.parentElement.remove();
+            }
+        });
+
+        socket.on("receive-message", (data) => {
+            addMessageToChat(data.userId || 'User', data.message);
         });
 
         function createPeerConnection(id) {
@@ -203,8 +369,8 @@
             });
 
             pc.ontrack = (event) => {
-                console.log("Received remote track:", event.track.kind);
-                remoteVideo.srcObject = event.streams[0];
+                console.log("Received remote track");
+                addRemoteVideo(id, event.streams[0]);
             };
 
             pc.onicecandidate = (event) => {
@@ -218,16 +384,86 @@
                 }
             };
 
-            pc.onconnectionstatechange = () => {
-                console.log("Connection state:", pc.connectionState);
-            };
-
             return pc;
+        }
+
+        function addRemoteVideo(id, stream) {
+            if (!document.getElementById(`video-${id}`)) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'video-wrapper';
+                wrapper.innerHTML = `
+                    <video id="video-${id}" autoplay playsinline></video>
+                    <div class="video-label">${userNames[id] || 'Remote User'}</div>
+                `;
+                videosContainer.appendChild(wrapper);
+            }
+            document.getElementById(`video-${id}`).srcObject = stream;
+        }
+
+        async function loadChatMessages() {
+            try {
+                const response = await fetch(`/api/meetings/${room}/messages`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const messages = await response.json();
+                messages.forEach(msg => {
+                    addMessageToChat(msg.name, msg.message);
+                });
+            } catch (err) {
+                console.error('Error loading messages:', err);
+            }
+        }
+
+        function addMessageToChat(user, message) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'chat-message';
+            const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            msgDiv.innerHTML = `
+                <div class="message-user">${user}</div>
+                ${message}
+                <div class="message-time">${time}</div>
+            `;
+            chatMessages.appendChild(msgDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+
+            try {
+                await fetch(`/api/meetings/${room}/messages`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ message })
+                });
+
+                socket.emit('send-message', { room, message });
+                addMessageToChat('You', message);
+                input.value = '';
+            } catch (err) {
+                console.error('Error sending message:', err);
+            }
+        }
+
+        function handleChatKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        function toggleChat() {
+            document.getElementById('chatSection').classList.toggle('active');
         }
 
         function copyMeetingCode() {
             navigator.clipboard.writeText(room).then(() => {
-                alert('Meeting code copied to clipboard!');
+                alert('Meeting code copied!');
             });
         }
 
@@ -235,12 +471,12 @@
             if (localStream) {
                 localStream.getTracks().forEach(track => track.stop());
             }
-            if (peerConnection) {
-                peerConnection.close();
-            }
+            Object.values(peerConnections).forEach(pc => pc.close());
             socket.disconnect();
-            window.location.href = '/';
+            window.location.href = '/dashboard.html';
         }
+
+        window.addEventListener('load', init);
     </script>
 </body>
 </html>

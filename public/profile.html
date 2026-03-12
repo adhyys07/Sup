@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile - Sup!</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+        }
+        .navbar {
+            background: white;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        .navbar-left {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+            flex: 1;
+        }
+        h1 {
+            color: #667eea;
+            font-size: 24px;
+        }
+        nav a {
+            color: #666;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+        nav a:hover {
+            color: #667eea;
+        }
+        .navbar-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #667eea;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+        }
+        .user-name {
+            color: #333;
+            font-weight: 500;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        .btn-logout {
+            background: #d32f2f;
+            color: white;
+        }
+        .btn-logout:hover {
+            background: #c62828;
+        }
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+        .container {
+            max-width: 600px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+        .profile-card {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        .profile-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .profile-avatar {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: #667eea;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            margin: 0 auto 20px;
+        }
+        .profile-card h2 {
+            color: #333;
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        .profile-email {
+            color: #666;
+            font-size: 14px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 16px;
+            font-family: inherit;
+        }
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 30px;
+        }
+        .button-group button {
+            flex: 1;
+            padding: 12px;
+            font-size: 16px;
+        }
+        .btn-cancel {
+            background: #f0f0f0;
+            color: #333;
+        }
+        .btn-cancel:hover {
+            background: #e0e0e0;
+        }
+        .message {
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .message.success {
+            background: #c8e6c9;
+            color: #2e7d32;
+            display: block;
+        }
+        .message.error {
+            background: #ffcdd2;
+            color: #c62828;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <div class="navbar-left">
+            <h1>Sup!</h1>
+            <nav>
+                <a href="#" onclick="goToDashboard()">Dashboard</a>
+                <a href="#" onclick="goToProfile()">Profile</a>
+            </nav>
+        </div>
+        <div class="navbar-right">
+            <div class="user-info">
+                <div class="avatar" id="userAvatar">U</div>
+                <div class="user-name" id="userName">User</div>
+            </div>
+            <button class="btn-logout" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="profile-card">
+            <div class="profile-header">
+                <div class="profile-avatar" id="profileAvatar">U</div>
+                <h2 id="profileName">User</h2>
+                <div class="profile-email" id="profileEmail">user@email.com</div>
+            </div>
+
+            <div id="message" class="message"></div>
+
+            <form onsubmit="saveProfile(event)">
+                <div class="form-group">
+                    <label>Name</label>
+                    <input type="text" id="nameInput" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Bio</label>
+                    <textarea id="bioInput" placeholder="Tell us about yourself"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Avatar URL (Optional)</label>
+                    <input type="url" id="avatarInput" placeholder="https://example.com/avatar.jpg">
+                </div>
+
+                <div class="button-group">
+                    <button type="button" class="btn-cancel" onclick="goToDashboard()">Back</button>
+                    <button type="submit" class="btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/';
+        }
+
+        let currentUser = null;
+
+        async function initProfile() {
+            await fetchUserProfile();
+        }
+
+        async function fetchUserProfile() {
+            try {
+                const response = await fetch('/api/user/profile', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const user = await response.json();
+                currentUser = user;
+
+                document.getElementById('userName').textContent = user.name;
+                document.getElementById('profileName').textContent = user.name;
+                document.getElementById('profileEmail').textContent = user.email;
+                document.getElementById('profileAvatar').textContent = user.name[0].toUpperCase();
+                document.getElementById('userAvatar').textContent = user.name[0].toUpperCase();
+
+                document.getElementById('nameInput').value = user.name;
+                document.getElementById('bioInput').value = user.bio || '';
+                document.getElementById('avatarInput').value = user.avatar || '';
+            } catch (err) {
+                console.error('Error fetching profile:', err);
+            }
+        }
+
+        async function saveProfile(event) {
+            event.preventDefault();
+
+            const name = document.getElementById('nameInput').value;
+            const bio = document.getElementById('bioInput').value;
+            const avatar = document.getElementById('avatarInput').value;
+
+            try {
+                const response = await fetch('/api/user/profile', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ name, bio, avatar })
+                });
+
+                const updated = await response.json();
+                showMessage('Profile updated successfully!', 'success');
+                setTimeout(() => {
+                    window.location.href = '/dashboard.html';
+                }, 1500);
+            } catch (err) {
+                showMessage('Error updating profile: ' + err.message, 'error');
+            }
+        }
+
+        function showMessage(text, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = text;
+            messageDiv.className = `message ${type}`;
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            window.location.href = '/';
+        }
+
+        function goToDashboard() {
+            window.location.href = '/dashboard.html';
+        }
+
+        function goToProfile() {
+            window.location.href = '/profile.html';
+        }
+
+        window.addEventListener('load', initProfile);
+    </script>
+</body>
+</html>
