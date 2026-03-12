@@ -5,12 +5,17 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import cors from 'cors';
 import passport from 'passport';
+import { google } from 'googleapis';
+import multer from 'multer';
+import fs from 'fs';
+import path from 'path';
+import { randomUUID } from 'crypto';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { Strategy as GitHubStrategy } from 'passport-github2';
 import 'dotenv/config';
 import { db } from './db.js';
 import { users, meetings, meetingParticipants, messages } from './schema.js';
-import { eq, or, and, inArray } from 'drizzle-orm';
+import { eq, or, and, inArray, sql } from 'drizzle-orm';
 
 const app = express();
 const server = http.createServer(app);
@@ -28,7 +33,164 @@ app.use(express.static('public'));
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this';
+const GOOGLE_CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+const TEMP_ATTACHMENTS_DIR = path.join(process.cwd(), 'temp', 'meeting-attachments');
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
+fs.mkdirSync(TEMP_ATTACHMENTS_DIR, { recursive: true });
+
+const roomRuntimeMessages = new Map();
+const roomCleanupTimers = new Map();
+const roomChatBanned = new Map();
+const roomChatLocked = new Map();
+const instantRoomHosts = new Map();
+function getRoomAttachmentDir(roomCode) {
+    return path.join(TEMP_ATTACHMENTS_DIR, roomCode);
+}
+
+function ensureRoomAttachmentDir(roomCode) {
+    const roomDir = getRoomAttachmentDir(roomCode);
+    fs.mkdirSync(roomDir, { recursive: true });
+    return roomDir;
+}
+
+function scheduleRoomCleanup(roomCode) {
+    if (roomCleanupTimers.has(roomCode)) {
+        clearTimeout(roomCleanupTimers.get(roomCode));
+    }
+
+    const timer = setTimeout(async () => {
+        roomCleanupTimers.delete(roomCode);
+        const activeRoom = io.sockets.adapter.rooms.get(roomCode);
+        if (activeRoom && activeRoom.size > 0) {
+            return;
+        }
+
+        roomRuntimeMessages.delete(roomCode);
+        roomChatBanned.delete(roomCode);
+        roomChatLocked.delete(roomCode);
+        instantRoomHosts.delete(roomCode);
+        fs.rmSync(getRoomAttachmentDir(roomCode), { recursive: true, force: true });
+
+        try {
+            await db.update(meetings)
+                .set({ endedAt: new Date(), updatedAt: new Date() })
+                .where(eq(meetings.meetingCode, roomCode));
+        } catch (err) {
+            console.error('Failed to mark meeting ended:', err);
+        }
+    }, 30000);
+
+    roomCleanupTimers.set(roomCode, timer);
+}
+
+function cancelRoomCleanup(roomCode) {
+    const timer = roomCleanupTimers.get(roomCode);
+    if (!timer) return;
+    clearTimeout(timer);
+    roomCleanupTimers.delete(roomCode);
+}
+
+const attachmentStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        try {
+            cb(null, ensureRoomAttachmentDir(req.params.code));
+        } catch (err) {
+            cb(err);
+        }
+    },
+    filename: (req, file, cb) => {
+        const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+        cb(null, `${Date.now()}-${randomUUID()}-${safeName}`);
+    }
+});
+
+const uploadAttachment = multer({
+    storage: attachmentStorage,
+    limits: { fileSize: MAX_ATTACHMENT_BYTES }
+});
+
+function buildAttachmentMessage(roomCode, userId, userName, file) {
+    return {
+        id: `attachment-${randomUUID()}`,
+        kind: 'attachment',
+        userId,
+        name: userName || 'User',
+        message: '',
+        createdAt: new Date().toISOString(),
+        attachment: {
+            id: randomUUID(),
+            originalName: file.originalname,
+            storedName: file.filename,
+            mimeType: file.mimetype,
+            size: file.size,
+            url: `/api/meetings/${encodeURIComponent(roomCode)}/attachments/${encodeURIComponent(file.filename)}`
+        }
+    };
+}
+
+function getGoogleCalendarOAuthClient() {
+    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+        throw new Error('Google OAuth is not configured');
+    }
+
+    return new google.auth.OAuth2(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET,
+        `${BASE_URL}/auth/google/calendar/callback`
+    );
+}
+
+async function createGoogleCalendarEventForUser(userId, meeting) {
+    const result = await db.select({
+        googleCalendarRefreshToken: users.googleCalendarRefreshToken
+    }).from(users).where(eq(users.id, userId));
+
+    const refreshToken = result[0]?.googleCalendarRefreshToken;
+    if (!refreshToken) {
+        return { inserted: false, reason: 'not-connected' };
+    }
+
+    try {
+        const auth = getGoogleCalendarOAuthClient();
+        auth.setCredentials({ refresh_token: refreshToken });
+
+        const calendar = google.calendar({ version: 'v3', auth });
+        const start = new Date(meeting.scheduledTime);
+        const end = new Date(start.getTime() + 30 * 60 * 1000);
+
+        const response = await calendar.events.insert({
+            calendarId: 'primary',
+            requestBody: {
+                summary: meeting.title || 'Sup Meeting',
+                description: `Join meeting: ${BASE_URL}/meeting.html?room=${meeting.meetingCode}`,
+                start: { dateTime: start.toISOString() },
+                end: { dateTime: end.toISOString() }
+            }
+        });
+
+        return {
+            inserted: true,
+            eventId: response.data.id,
+            eventLink: response.data.htmlLink
+        };
+    } catch (err) {
+        return {
+            inserted: false,
+            reason: 'insert-failed',
+            error: err.message
+        };
+    }
+}
+
+async function isHostForRoom(userId, roomCode) {
+    const result = await db
+        .select({ hostId: meetings.hostId })
+        .from(meetings)
+        .where(eq(meetings.meetingCode, roomCode));
+
+    return result.length > 0 && result[0].hostId === userId;
+}
 // ============ PASSPORT CONFIG ============
 async function findOrCreateOAuthUser(profile, provider) {
     const email = profile.emails?.[0]?.value;
@@ -66,6 +228,26 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
             done(err, null);
         }
     }));
+
+    passport.use('google-calendar', new GoogleStrategy({
+        clientID: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        callbackURL: `${BASE_URL}/auth/google/calendar/callback`,
+        scope: ['profile', 'email', GOOGLE_CALENDAR_SCOPE],
+        proxy: true,
+        passReqToCallback: true
+    }, async (req, accessToken, refreshToken, profile, done) => {
+        try {
+            const decoded = jwt.verify(req.query.state, JWT_SECRET);
+            done(null, {
+                userId: decoded.userId,
+                googleCalendarEmail: profile.emails?.[0]?.value || null,
+                refreshToken
+            });
+        } catch (err) {
+            done(err, null);
+        }
+    }));
 }
 
 if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
@@ -92,6 +274,51 @@ app.get('/auth/google/callback',
     (req, res) => {
         const token = jwt.sign({ id: req.user.id }, JWT_SECRET);
         res.redirect(`/auth-success.html?token=${token}`);
+    }
+);
+
+app.get('/auth/google/calendar', (req, res, next) => {
+    const token = req.query.token;
+    if (!token) {
+        return res.status(401).send('Missing token');
+    }
+
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        const state = jwt.sign({ userId: decoded.id, purpose: 'google-calendar-connect' }, JWT_SECRET, { expiresIn: '10m' });
+
+        passport.authenticate('google-calendar', {
+            session: false,
+            scope: ['profile', 'email', GOOGLE_CALENDAR_SCOPE],
+            accessType: 'offline',
+            prompt: 'consent',
+            state
+        })(req, res, next);
+    } catch (err) {
+        res.status(401).send('Invalid token');
+    }
+});
+
+app.get('/auth/google/calendar/callback',
+    passport.authenticate('google-calendar', { session: false, failureRedirect: '/dashboard.html?calendar=error' }),
+    async (req, res) => {
+        try {
+            if (!req.user?.userId || !req.user?.refreshToken) {
+                return res.redirect('/dashboard.html?calendar=error');
+            }
+
+            await db.update(users)
+                .set({
+                    googleCalendarEmail: req.user.googleCalendarEmail,
+                    googleCalendarRefreshToken: req.user.refreshToken,
+                    updatedAt: new Date()
+                })
+                .where(eq(users.id, req.user.userId));
+
+            res.redirect('/dashboard.html?calendar=connected');
+        } catch (err) {
+            res.redirect('/dashboard.html?calendar=error');
+        }
     }
 );
 
@@ -169,10 +396,24 @@ app.get('/api/user/profile', verifyToken, async (req, res) => {
             email: users.email,
             name: users.name,
             bio: users.bio,
-            avatar: users.avatar
+            avatar: users.avatar,
+            googleCalendarEmail: users.googleCalendarEmail,
+            googleCalendarRefreshToken: users.googleCalendarRefreshToken
         }).from(users).where(eq(users.id, req.userId));
-        
-        res.json(result[0]);
+
+        if (!result[0]) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        res.json({
+            id: result[0].id,
+            email: result[0].email,
+            name: result[0].name,
+            bio: result[0].bio,
+            avatar: result[0].avatar,
+            googleCalendarEmail: result[0].googleCalendarEmail,
+            googleCalendarConnected: !!result[0].googleCalendarRefreshToken
+        });
     } catch (err) {
         res.status(400).json({ error: err.message });
     }
@@ -210,8 +451,16 @@ app.post('/api/meetings', verifyToken, async (req, res) => {
             meetingCode,
             scheduledTime: scheduledTime ? new Date(scheduledTime) : null
         }).returning();
-        
-        res.json(result[0]);
+
+        let calendar = { inserted: false, reason: 'not-scheduled' };
+        if (result[0]?.scheduledTime) {
+            calendar = await createGoogleCalendarEventForUser(req.userId, result[0]);
+        }
+
+        res.json({
+            ...result[0],
+            calendar
+        });
     } catch (err) {
         res.status(400).json({ error: err.message });
     }
@@ -243,8 +492,15 @@ app.get('/api/meetings', verifyToken, async (req, res) => {
             )
         )
         .orderBy(meetings.createdAt);
-        
-        res.json(result);
+
+        const now = new Date();
+        const upcomingMeetings = result.filter((meeting) => {
+            if (meeting.endedAt) return false;
+            if (!meeting.scheduledTime) return false;
+            return new Date(meeting.scheduledTime) >= now;
+        });
+
+        res.json(upcomingMeetings);
     } catch (err) {
         res.status(400).json({ error: err.message });
     }
@@ -330,34 +586,105 @@ app.post('/api/meetings/:code/messages', verifyToken, async (req, res) => {
     }
 });
 
+app.post('/api/meetings/:code/attachments', verifyToken, (req, res, next) => {
+    uploadAttachment.single('file')(req, res, (err) => {
+        if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ error: 'File must be 10MB or smaller' });
+        }
+        if (err) {
+            return res.status(400).json({ error: err.message });
+        }
+        next();
+    });
+}, async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No file uploaded' });
+        }
+
+        const roomCode = req.params.code;
+        const userResult = await db.select({ name: users.name }).from(users).where(eq(users.id, req.userId));
+        const attachmentMessage = buildAttachmentMessage(roomCode, req.userId, userResult[0]?.name, req.file);
+        const roomMessages = roomRuntimeMessages.get(roomCode) || [];
+        roomMessages.push(attachmentMessage);
+        roomRuntimeMessages.set(roomCode, roomMessages);
+
+        io.to(roomCode).emit('receive-message', attachmentMessage);
+        res.json(attachmentMessage);
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+});
+
+app.get('/api/meetings/:code/attachments/:fileName', verifyToken, (req, res) => {
+    const roomCode = req.params.code;
+    const fileName = req.params.fileName;
+    const runtimeMessages = roomRuntimeMessages.get(roomCode) || [];
+    const attachmentMessage = runtimeMessages.find((entry) => entry.kind === 'attachment' && entry.attachment?.storedName === fileName);
+
+    if (!attachmentMessage) {
+        return res.status(404).json({ error: 'Attachment not found' });
+    }
+
+    const filePath = path.join(getRoomAttachmentDir(roomCode), fileName);
+    if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ error: 'Attachment file not found' });
+    }
+
+    res.download(filePath, attachmentMessage.attachment.originalName);
+});
+
 app.get('/api/meetings/:code/messages', verifyToken, async (req, res) => {
     try {
         const meetingResult = await db.select().from(meetings).where(eq(meetings.meetingCode, req.params.code));
-        
-        if (meetingResult.length === 0) {
-            return res.status(404).json({ error: 'Meeting not found' });
+
+        let persistedMessages = [];
+        if (meetingResult.length > 0) {
+            persistedMessages = await db.select({
+                id: messages.id,
+                meetingId: messages.meetingId,
+                userId: messages.userId,
+                message: messages.message,
+                name: users.name,
+                createdAt: messages.createdAt,
+                kind: sql`'text'`
+            })
+            .from(messages)
+            .leftJoin(users, eq(messages.userId, users.id))
+            .where(eq(messages.meetingId, meetingResult[0].id))
+            .orderBy(messages.createdAt);
         }
-        
-        const result = await db.select({
-            id: messages.id,
-            meetingId: messages.meetingId,
-            userId: messages.userId,
-            message: messages.message,
-            name: users.name,
-            createdAt: messages.createdAt
-        })
-        .from(messages)
-        .leftJoin(users, eq(messages.userId, users.id))
-        .where(eq(messages.meetingId, meetingResult[0].id))
-        .orderBy(messages.createdAt);
-        
-        res.json(result);
+
+        const runtimeMessages = roomRuntimeMessages.get(req.params.code) || [];
+        const combinedMessages = [...persistedMessages, ...runtimeMessages]
+            .sort((left, right) => new Date(left.createdAt) - new Date(right.createdAt));
+
+        res.json(combinedMessages);
     } catch (err) {
         res.status(400).json({ error: err.message });
     }
 });
 
 // ============ ROOM INFO ============
+app.get('/api/meetings/:code/host-check', verifyToken, async (req, res) => {
+    try {
+        const meetingResult = await db.select({ hostId: meetings.hostId })
+            .from(meetings)
+            .where(eq(meetings.meetingCode, req.params.code));
+
+        if (meetingResult.length > 0) {
+            // Scheduled meeting - check if user is the host
+            res.json({ isHost: meetingResult[0].hostId === req.userId });
+        } else {
+            // Instant/ad-hoc meeting - check if user is the first joiner
+            const instantHost = instantRoomHosts.get(req.params.code);
+            res.json({ isHost: instantHost === req.userId });
+        }
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+});
+
 app.get('/api/rooms/:code/participants', verifyToken, (req, res) => {
     const roomCode = req.params.code;
     const room = io.sockets.adapter.rooms.get(roomCode);
@@ -383,10 +710,31 @@ app.get('/join/:code', (req, res) => {
 const connectedUsers = {};
 
 io.on('connection', (socket) => {
-    socket.on('join-room', (room, userId, userName) => {
+    socket.on('join-room', async (room, userId, userName) => {
+        const roomBefore = io.sockets.adapter.rooms.get(room);
+        const isFirstJoiner = !roomBefore || roomBefore.size === 0;
+        
+        cancelRoomCleanup(room);
         socket.join(room);
         connectedUsers[socket.id] = { userId, room, name: userName || 'User' };
+        
+        // If first joiner, check if this is an instant room (no DB record)
+        if (isFirstJoiner) {
+            const dbMeeting = await db.select().from(meetings).where(eq(meetings.meetingCode, room));
+            if (dbMeeting.length === 0) {
+                // Ad-hoc meeting, first joiner is host
+                instantRoomHosts.set(room, userId);
+            }
+        }
+        
         socket.to(room).emit('user-joined', socket.id, userName);
+
+        db.update(meetings)
+            .set({ startedAt: new Date(), endedAt: null, updatedAt: new Date() })
+            .where(eq(meetings.meetingCode, room))
+            .catch((err) => {
+                console.error('Failed to mark meeting started:', err);
+            });
     });
 
     socket.on('signal', (data) => {
@@ -396,14 +744,27 @@ io.on('connection', (socket) => {
         });
     });
 
-    socket.on('send-message', (data) => {
-        io.to(data.room).emit('receive-message', {
-            from: socket.id,
-            userId: connectedUsers[socket.id]?.userId,
-            message: data.message,
-            timestamp: new Date()
-        });
+    socket.on('send-message', async (data) => {
+    const actor = connectedUsers[socket.id];
+    if (!actor || actor.room !== data.room) return;
+
+    const banned = roomChatBanned.get(data.room);
+    if (banned && banned.has(actor.userId)) return;
+
+    if (roomChatLocked.get(data.room)) {
+        const hostOk = await isHostForRoom(actor.userId, data.room);
+        if (!hostOk) return;
+    }
+
+    io.to(data.room).emit('receive-message', {
+        from: socket.id,
+        userId: actor.userId,
+        name: actor.name || 'User',
+        kind: 'text',
+        message: data.message,
+        createdAt: new Date().toISOString()
     });
+});
 
     socket.on('camera-state', (data) => {
         socket.to(data.room).emit('camera-state', {
@@ -412,10 +773,58 @@ io.on('connection', (socket) => {
         });
     });
 
+
+    socket.on('host-control', async ({ room, targetId, action }) => {
+        const actor = connectedUsers[socket.id];
+        const target = connectedUsers[targetId];
+
+        if (!actor || actor.room !== room) return;
+        if (!target || target.room !== room) return;
+        if (targetId === socket.id) return;
+
+        const allowed = ['mute-audio', 'mute-video', 'remove', 'disable-chat', 'enable-chat'];
+        if (!allowed.includes(action)) return;
+
+        const hostOk = await isHostForRoom(actor.userId, room);
+        if (!hostOk) return;
+
+        if (action === 'disable-chat') {
+            const bannedSet = roomChatBanned.get(room) || new Set();
+            bannedSet.add(target.userId);
+            roomChatBanned.set(room, bannedSet);
+        } else if (action === 'enable-chat') {
+            roomChatBanned.get(room)?.delete(target.userId);
+        }
+
+        io.to(targetId).emit('host-control', { action, byName: actor.name || 'Host' });
+    });
+
+    socket.on('host-room-control', async ({room,action}) => {
+        const actor = connectedUsers[socket.id];
+        if (!actor || actor.room !== room) return;
+
+        const allowed = ['lock-chat', 'unlock-chat'];
+        if (!allowed.includes(action)) return;
+
+        const hostOk = await isHostForRoom(actor.userId, room);
+        if (!hostOk) return;
+
+        if (action === 'lock-chat') {
+            roomChatLocked.set(room, true);
+        } else {
+            roomChatLocked.delete(room);
+        }
+        socket.to
+    });
+
     socket.on('disconnect', () => {
         const userData = connectedUsers[socket.id];
         if (userData) {
             io.to(userData.room).emit('user-left', socket.id);
+            const room = io.sockets.adapter.rooms.get(userData.room);
+            if (!room || room.size === 0) {
+                scheduleRoomCleanup(userData.room);
+            }
         }
         delete connectedUsers[socket.id];
     });

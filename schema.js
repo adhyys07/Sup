@@ -10,6 +10,8 @@ export const users = pgTable('users', {
     avatar: varchar('avatar', { length: 500 }),
     authProvider: varchar('auth_provider', { length: 50 }).default('local'),
     authProviderId: varchar('auth_provider_id', { length: 255 }),
+    googleCalendarEmail: varchar('google_calendar_email', { length: 255 }),
+    googleCalendarRefreshToken: text('google_calendar_refresh_token'),
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow()
 });

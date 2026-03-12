@@ -173,6 +173,7 @@
         .chat-input {
             padding: 10px 14px; border-top: 1px solid #2a2a2a;
             display: flex; gap: 8px; flex-shrink: 0;
+            align-items: center;
         }
         .chat-input input {
             flex: 1; padding: 8px 12px; border: 1px solid #3a3a3a;
@@ -183,8 +184,49 @@
             background: #667eea; color: white; border-radius: 20px; padding: 8px 14px; font-size: 13px;
         }
         .chat-input button:hover { background: #5568d3; }
+        .attachment-btn {
+            background: #2a2a2a !important;
+            color: white;
+            min-width: 42px;
+            padding: 8px 10px !important;
+        }
+        .message-attachment {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #fff;
+            text-decoration: none;
+            font-weight: 600;
+            margin-top: 2px;
+        }
+        .message-attachment:hover {
+            text-decoration: underline;
+        }
+        .attachment-meta {
+            color: #aaa;
+            font-size: 11px;
+            margin-top: 4px;
+        }
 
         /* ── Call controls bar ── */
+                /* ── Host controls overlay ── */
+                .host-controls {
+                    position: absolute; top: 8px; right: 8px;
+                    display: flex; gap: 4px;
+                    opacity: 0; transition: opacity 0.2s; z-index: 10;
+                }
+                .video-wrapper:hover .host-controls { opacity: 1; }
+                .host-btn {
+                    background: rgba(0,0,0,0.65); border: none; color: white;
+                    width: 28px; height: 28px; border-radius: 50%;
+                    cursor: pointer; font-size: 12px; display: flex;
+                    align-items: center; justify-content: center;
+                    padding: 0; transition: background 0.2s;
+                }
+                .host-btn:hover { background: rgba(198,40,40,0.85); }
+                .host-btn.banned { background: rgba(198,40,40,0.7); }
+
+                /* ── Call controls bar ── */
         .call-controls {
             flex-shrink: 0; height: 68px;
             display: flex; justify-content: center; align-items: center; gap: 14px;
@@ -305,6 +347,8 @@
             </div>
             <div class="chat-messages" id="chatMessages"></div>
             <div class="chat-input">
+                <input type="file" id="chatFileInput" hidden onchange="handleAttachmentSelected(event)">
+                <button class="attachment-btn" onclick="openAttachmentPicker()" title="Attach file">📎</button>
                 <input type="text" id="chatInput" placeholder="Type a message..." onkeypress="handleChatKeyPress(event)">
                 <button onclick="sendMessage()">Send</button>
             </div>
@@ -315,6 +359,7 @@
     <div class="call-controls" id="callControls">
         <button id="callMicBtn" class="ctrl-on" onclick="toggleCallMic()" title="Toggle microphone">🎤</button>
         <button id="callCamBtn" class="ctrl-on" onclick="toggleCallCam()" title="Toggle camera">📷</button>
+        <button id="lockChatBtn" class="ctrl-on" onclick="toggleRoomChat()" title="Lock chat" style="display:none">🔒</button>
         <button id="presentbtn" class="ctrl-on" onclick="togglePresent()" title="Toggle presentation">📽️</button>
         <button id="leaveBtn" class="ctrl-on" onclick="leaveMeeting()" title="Leave meeting">🚪</button>
     </div>
@@ -340,10 +385,17 @@
         let camEnabled = true;
         let currentUser = null;
 
+        let meetingInfo = null;
+        let isHost = false;
+        let chatBanned = false;
+        let roomChatLocked = false;
+        const participantChatBanned = {};
+
         const localVideo = document.getElementById('localVideo');
         const localCamPip = document.getElementById('localCamPip');
         const videosContainer = document.getElementById('videosContainer');
         const chatMessages = document.getElementById('chatMessages');
+        const chatFileInput = document.getElementById('chatFileInput');
 
         // Fetch current user info
         async function getCurrentUser() {
@@ -376,7 +428,43 @@
             for (let i = 0; i < value.length; i++) hash += value.charCodeAt(i);
             return themes[hash % themes.length];
         }
+        function toggleRoomChat(){
+            const action = roomChatLocked ? 'unlock-chat' : 'lock-chat';
+            socket.emit('host-room-control', { room, action });
+            roomChatLocked = !roomChatLocked;
+            const btn = document.getElementById('lockChatBtn');
+            if (btn){
+                btn.textContent = roomChatLocked ? '🔓' : '🔒';
+                btn.title = roomChatLocked ? 'Unlock chat for all' : 'Lock chat for all';
+                btn.classList.toggle('ctrl-off',roomChatLocked)
+                btn.classList.toggle('ctrl-on',!roomChatLocked)
+            }
+        }
 
+        socket.on('host-room-control',({action,byName})=>{
+            const by = byName || 'Host';
+            if (action === 'lock-chat'){
+                roomChatLocked = true;
+                if (!chatBanned){
+                    const input = document.getElementById('chatInput');
+                    input.disabled = true;
+                    input.placeholder = 'Chat is locked by host';
+                    document.querySelector('.chat-input button:last-of-type').disabled = true;
+                    document.querySelector('.attachment-btn').disabled = true;
+                }
+                showHostNotification(`${by} locked the chat for everyone!`);
+            } else if (action === 'unlock-chat'){
+                roomChatLocked = false;
+                if (!chatBanned){
+                    const input = document.getElementById('chatInput');
+                    input.disabled = false;
+                    input.placeholder = 'Type a message...';
+                    document.querySelector('.chat-input button:last-of-type').disabled = false;
+                    document.querySelector('.attachment-btn').disabled = false;
+                }
+                showHostNotification(`${by} unlocked the chat for everyone!`);
+            }
+        })
         function setTileCameraState(tileId, userName, isOff) {
             const wrapper = document.getElementById(tileId);
             if (!wrapper) return;
@@ -412,6 +500,32 @@
                 userNames['local'] = currentUser.name;
 
                 // Get camera preview for lobby
+                                try {
+                                    const mRes = await fetch(`/api/meetings/${room}`, {
+                                        headers: { 'Authorization': `Bearer ${token}` }
+                                    });
+                                    if (mRes.ok) {
+                                        meetingInfo = await mRes.json();
+                                        isHost = meetingInfo.hostId === currentUser.id;
+                                    }
+                                } catch { /* disposable instant room — no DB record */ }
+                                
+                                // Check if we're the host (works for both scheduled and instant rooms)
+                                try {
+                                    const hRes = await fetch(`/api/meetings/${room}/host-check`, {
+                                        headers: { 'Authorization': `Bearer ${token}` }
+                                    });
+                                    if (hRes.ok) {
+                                        const hData = await hRes.json();
+                                        isHost = hData.isHost;
+                                    }
+                                } catch { /* error checking host status */ }
+                                
+                                if (isHost) {
+                                    document.getElementById('lockChatBtn').style.display = '';
+                                }
+
+                                // Get camera preview for lobby
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 localStream = stream;
                 document.getElementById('lobbyVideo').srcObject = stream;
@@ -648,6 +762,7 @@
                 delete peerConnections[id];
             }
             delete remoteCameraOff[id];
+            delete participantChatBanned[id];
             const videoElement = document.getElementById(`video-${id}`);
             if (videoElement) {
                 videoElement.parentElement.remove();
@@ -656,12 +771,52 @@
         });
 
         socket.on("receive-message", (data) => {
-            addMessageToChat(data.userId || 'User', data.message);
+            addMessageToChat(data);
         });
 
         socket.on('camera-state', ({ from, isOff }) => {
             remoteCameraOff[from] = !!isOff;
             setTileCameraState(`tile-${from}`, userNames[from] || 'Remote User', !!isOff);
+        });
+
+        socket.on('host-control', ({ action, byName }) => {
+            const by = byName || 'Host';
+            if (action === 'mute-audio') {
+                micEnabled = false;
+                localStream?.getAudioTracks().forEach(t => t.enabled = false);
+                syncCallControls();
+                showHostNotification(`${by} muted your microphone`);
+            } else if (action === 'mute-video') {
+                if (isPresenting) stopPresent();
+                camEnabled = false;
+                localStream?.getVideoTracks().forEach(t => t.enabled = false);
+                setTileCameraState('tile-local', (currentUser?.name || 'You') + ' (You)', true);
+                socket.emit('camera-state', { room, isOff: true });
+                syncLocalCamPip();
+                syncCallControls();
+                showHostNotification(`${by} turned off your camera`);
+            } else if (action === 'remove') {
+                alert(`You were removed from the meeting by ${by}.`);
+                leaveMeeting();
+            } else if (action === 'disable-chat') {
+                chatBanned = true;
+                const input = document.getElementById('chatInput');
+                input.disabled = true;
+                input.placeholder = 'Chat disabled by host';
+                document.querySelector('.chat-input button:last-of-type').disabled = true;
+                document.querySelector('.attachment-btn').disabled = true;
+                showHostNotification(`${by} disabled your chat`);
+            } else if (action === 'enable-chat') {
+                chatBanned = false;
+                if (!roomChatLocked){
+                    const input = document.getElementById('chatInput');
+                    input.disabled = false;
+                    input.placeholder = 'Type a message...';
+                    document.querySelector('.chat-input button:last-of-type').disabled = false;
+                    document.querySelector('.attachment-btn').disabled = false;
+                }
+                showHostNotification(`${by} re-enabled your chat`);
+            }
         });
 
         function createPeerConnection(id) {
@@ -694,6 +849,34 @@
             return pc;
         }
 
+        function sendHostControl(targetId, action) {
+            socket.emit('host-control', { room, targetId, action });
+        }
+
+        function toggleParticipantChat(targetId) {
+            const isBanned = !!participantChatBanned[targetId];
+            sendHostControl(targetId, isBanned ? 'enable-chat' : 'disable-chat');
+            participantChatBanned[targetId] = !isBanned;
+            const btn = document.getElementById(`chat-ban-btn-${targetId}`);
+            if (btn) {
+                btn.classList.toggle('banned', !isBanned);
+                btn.title = participantChatBanned[targetId] ? 'Re-enable chat' : 'Disable chat';
+            }
+        }
+
+        function showHostNotification(message) {
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                position:fixed; bottom:88px; left:50%; transform:translateX(-50%);
+                background:rgba(0,0,0,0.85); color:white; padding:10px 22px;
+                border-radius:20px; font-size:13px; z-index:1000;
+                backdrop-filter:blur(8px); pointer-events:none;
+            `;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3500);
+        }
+
         function addRemoteVideo(id, stream) {
             if (!document.getElementById(`video-${id}`)) {
                 const wrapper = document.createElement('div');
@@ -701,8 +884,32 @@
                 wrapper.id = `tile-${id}`;
                 wrapper.innerHTML = `
                     <video id="video-${id}" autoplay playsinline></video>
-                    <div class="video-label">${userNames[id] || 'Remote User'}</div>
+                    <div class="video-label">${escapeHtml(userNames[id] || 'Remote User')}</div>
                 `;
+
+                if (isHost) {
+                    const controls = document.createElement('div');
+                    controls.className = 'host-controls';
+
+                    const mkBtn = (emoji, title, handler) => {
+                        const b = document.createElement('button');
+                        b.className = 'host-btn';
+                        b.title = title;
+                        b.textContent = emoji;
+                        b.onclick = handler;
+                        return b;
+                    };
+
+                    const chatBtn = mkBtn('💬', 'Disable chat', () => toggleParticipantChat(id));
+                    chatBtn.id = `chat-ban-btn-${id}`;
+
+                    controls.appendChild(mkBtn('🔇', 'Mute microphone',     () => sendHostControl(id, 'mute-audio')));
+                    controls.appendChild(mkBtn('🚫', 'Turn off camera',     () => sendHostControl(id, 'mute-video')));
+                    controls.appendChild(chatBtn);
+                    controls.appendChild(mkBtn('✕',  'Remove from meeting', () => sendHostControl(id, 'remove')));
+                    wrapper.appendChild(controls);
+                }
+
                 videosContainer.appendChild(wrapper);
             }
             document.getElementById(`video-${id}`).srcObject = stream;
@@ -716,21 +923,51 @@
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const messages = await response.json();
-                messages.forEach(msg => {
-                    addMessageToChat(msg.name, msg.message);
-                });
+                messages.forEach(msg => addMessageToChat(msg));
             } catch (err) {
                 console.error('Error loading messages:', err);
             }
         }
 
-        function addMessageToChat(user, message) {
+        function escapeHtml(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function formatAttachmentSize(size) {
+            if (!size) return '';
+            if (size < 1024) return `${size} B`;
+            if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+            return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+        }
+
+        function addMessageToChat(entryOrUser, messageText) {
+            const entry = typeof entryOrUser === 'object'
+                ? entryOrUser
+                : { name: entryOrUser, message: messageText, kind: 'text' };
+            const user = entry.name || 'User';
             const msgDiv = document.createElement('div');
             msgDiv.className = 'chat-message';
-            const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const time = new Date(entry.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            let body = escapeHtml(entry.message || '');
+
+            if (entry.kind === 'attachment' && entry.attachment) {
+                body = `
+                    <a class="message-attachment" href="${entry.attachment.url}" target="_blank" rel="noopener noreferrer">
+                        <span>📎</span>
+                        <span>${escapeHtml(entry.attachment.originalName)}</span>
+                    </a>
+                    <div class="attachment-meta">${escapeHtml(entry.attachment.mimeType || 'file')} • ${formatAttachmentSize(entry.attachment.size)}</div>
+                `;
+            }
+
             msgDiv.innerHTML = `
-                <div class="message-user">${user}</div>
-                ${message}
+                <div class="message-user">${escapeHtml(user)}</div>
+                ${body}
                 <div class="message-time">${time}</div>
             `;
             chatMessages.appendChild(msgDiv);
@@ -738,9 +975,10 @@
         }
 
         async function sendMessage() {
+            if (chatBanned || roomChatLocked) return;
             const input = document.getElementById('chatInput');
             const message = input.value.trim();
-            
+
             if (!message) return;
 
             try {
@@ -754,10 +992,46 @@
                 });
 
                 socket.emit('send-message', { room, message });
-                addMessageToChat('You', message);
                 input.value = '';
             } catch (err) {
                 console.error('Error sending message:', err);
+            }
+        }
+
+        function openAttachmentPicker() {
+            chatFileInput.click();
+        }
+
+        async function handleAttachmentSelected(event) {
+            const file = event.target.files?.[0];
+            if (!file) return;
+
+            if (file.size > 10 * 1024 * 1024) {
+                alert('File must be 10MB or smaller.');
+                event.target.value = '';
+                return;
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                const response = await fetch(`/api/meetings/${room}/attachments`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                });
+
+                const payload = await response.json();
+                if (!response.ok) {
+                    throw new Error(payload.error || 'Failed to upload attachment');
+                }
+            } catch (err) {
+                alert(err.message);
+            } finally {
+                event.target.value = '';
             }
         }
 

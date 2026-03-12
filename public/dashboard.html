@@ -166,6 +166,7 @@
         .card-buttons {
             display: flex;
             gap: 10px;
+            flex-wrap: wrap;
         }
         .card-buttons button {
             flex: 1;
@@ -178,6 +179,24 @@
         }
         .btn-secondary:hover {
             background: #e0e0e0;
+        }
+        .btn-connected {
+            background: #2e7d32;
+            color: white;
+        }
+        .btn-connected:hover {
+            background: #256628;
+        }
+        .integration-row {
+            margin-top: 18px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .integration-status {
+            color: #666;
+            font-size: 14px;
         }
         .modal {
             display: none;
@@ -275,6 +294,10 @@
                 <button class="btn-primary" onclick="openCreateMeetingModal()">Schedule Meeting</button>
                 <button class="btn-primary" onclick="openJoinMeetingModal()">Join Meeting</button>
             </div>
+            <div class="integration-row">
+                <button class="btn-secondary" id="calendarConnectBtn" onclick="connectGoogleCalendar()">Connect Google Calendar</button>
+                <div class="integration-status" id="calendarStatus">Google Calendar not connected</div>
+            </div>
         </div>
 
         <div class="meetings-section">
@@ -332,6 +355,7 @@
         async function initDashboard() {
             await fetchUserProfile();
             await fetchMeetings();
+            handleCalendarCallbackStatus();
         }
 
         async function fetchUserProfile() {
@@ -345,6 +369,7 @@
                 document.getElementById('userName').textContent = user.name;
                 document.getElementById('welcomeName').textContent = user.name;
                 document.getElementById('userAvatar').textContent = user.name[0].toUpperCase();
+                updateCalendarIntegrationUI();
             } catch (err) {
                 console.error('Error fetching profile:', err);
             }
@@ -378,22 +403,22 @@
                     ? '<div class="meeting-host">Scheduled: ' + formatLocalDateTime(meeting.scheduledTime) + '</div>'
                     : '<div class="meeting-host">Instant meeting</div>';
 
-                return ''
-                     '<div class="meeting-card">'
-                       '<div class="meeting-title">' + escapeHtml(title) + '</div>'
-                       '<div class="meeting-code">' + escapeHtml(code) + '</div>'
-                       '<div class="meeting-host">Host: ' + escapeHtml(host) + '</div>'
-                       scheduled
-                       '<div class="card-buttons">'
-                         '<button class="btn-primary" onclick="joinMeetingByCode(\'' + code + '\')">Join</button>'
-                         '<button class="btn-secondary" onclick="copyToClipboard(\'' + code + '\')">Copy Code</button>'
-                       '</div>'
-                       '<div class="card-buttons" style="margin-top:8px;">'
-                         '<button class="btn-secondary" onclick="addToGoogleCalendar(\'' + code + '\')">Google Calendar</button>'
-                         '<button class="btn-secondary" onclick="downloadICS(\'' + code + '\')">Download ICS</button>'
-                       '</div>'
-                     '</div>';
-    }).join('');
+                                return ''
+                                        + '<div class="meeting-card">'
+                                        + '<div class="meeting-title">' + escapeHtml(title) + '</div>'
+                                        + '<div class="meeting-code">' + escapeHtml(code) + '</div>'
+                                        + '<div class="meeting-host">Host: ' + escapeHtml(host) + '</div>'
+                                        + scheduled
+                                        + '<div class="card-buttons">'
+                                        + '<button class="btn-primary" onclick="joinMeetingByCode(\'' + code + '\')">Join</button>'
+                                        + '<button class="btn-secondary" onclick="copyToClipboard(\'' + code + '\')">Copy Code</button>'
+                                        + '</div>'
+                                        + '<div class="card-buttons" style="margin-top:8px;">'
+                                        + '<button class="btn-secondary" onclick="addToGoogleCalendar(\'' + code + '\')">Google Calendar</button>'
+                                        + '<button class="btn-secondary" onclick="downloadICS(\'' + code + '\')">Download ICS</button>'
+                                        + '</div>'
+                                        + '</div>';
+                        }).join('');
         }
 
         async function createMeeting() {
@@ -423,13 +448,64 @@
 
                 if (time) {
                     await fetchMeetings();
-                    alert('Meeting scheduled successfully!');
+                    if (payload.calendar?.inserted) {
+                        alert('Meeting scheduled and added to your Google Calendar.');
+                    } else if (payload.calendar?.reason === 'not-connected') {
+                        const shouldConnect = confirm('Meeting scheduled, but Google Calendar is not connected yet. Connect it now for automatic insertion next time?');
+                        if (shouldConnect) connectGoogleCalendar();
+                    } else if (payload.calendar?.reason === 'insert-failed') {
+                        alert('Meeting scheduled, but automatic Google Calendar insertion failed. Reconnect Google Calendar and try again.');
+                    } else {
+                        alert('Meeting scheduled successfully!');
+                    }
                 } else {
                     window.location.href = '/meeting.html?room=' + payload.meetingCode;
                 }
             } catch (err) {
-                alert('Error creating meeting:', err.message);
+                alert('Error creating meeting: ' + err.message);
             }
+        }
+
+        function updateCalendarIntegrationUI() {
+            const button = document.getElementById('calendarConnectBtn');
+            const status = document.getElementById('calendarStatus');
+            if (!button || !status) return;
+
+            if (currentUser?.googleCalendarConnected) {
+                button.textContent = 'Reconnect Google Calendar';
+                button.classList.remove('btn-secondary');
+                button.classList.add('btn-connected');
+                status.textContent = currentUser.googleCalendarEmail
+                    ? 'Connected: ' + currentUser.googleCalendarEmail
+                    : 'Google Calendar connected';
+                return;
+            }
+
+            button.textContent = 'Connect Google Calendar';
+            button.classList.remove('btn-connected');
+            button.classList.add('btn-secondary');
+            status.textContent = 'Google Calendar not connected';
+        }
+
+        function handleCalendarCallbackStatus() {
+            const params = new URLSearchParams(window.location.search);
+            const status = params.get('calendar');
+            if (!status) return;
+
+            if (status === 'connected') {
+                alert('Google Calendar connected. Scheduled meetings will now be added automatically.');
+                fetchUserProfile();
+            } else if (status === 'error') {
+                alert('Google Calendar connection failed. Try again.');
+            }
+
+            params.delete('calendar');
+            const nextUrl = `${window.location.pathname}${params.toString() ? '?' + params.toString() : ''}`;
+            window.history.replaceState({}, '', nextUrl);
+        }
+
+        function connectGoogleCalendar() {
+            window.location.href = '/auth/google/calendar?token=' + encodeURIComponent(token);
         }
 
         function escapeHtml(value) {
@@ -437,7 +513,7 @@
                 .replace(/&/g, '&amp;')
                 .replace(/</g, '&lt;')
                 .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
+                    .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#039;');
         }
 
