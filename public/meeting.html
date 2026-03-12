@@ -343,6 +343,7 @@
         <div class="chat-section" id="chatSection">
             <div class="chat-header">
                 Chat
+                <span id="e2eeIndicator" style="font-size:10px;opacity:0.65;margin-left:6px;color:#4ade80"></span>
                 <button class="chat-close" onclick="toggleChat()" title="Close chat">✕</button>
             </div>
             <div class="chat-messages" id="chatMessages"></div>
@@ -391,6 +392,11 @@
         let roomChatLocked = false;
         const participantChatBanned = {};
 
+        // E2EE state
+        let e2eeRoomKey = null;
+        let e2eeKeyPair = null;
+        let e2eeChatLoaded = false;
+
         const localVideo = document.getElementById('localVideo');
         const localCamPip = document.getElementById('localCamPip');
         const videosContainer = document.getElementById('videosContainer');
@@ -428,10 +434,166 @@
             for (let i = 0; i < value.length; i++) hash += value.charCodeAt(i);
             return themes[hash % themes.length];
         }
+
+        // ============ E2EE CRYPTO ============
+        function bufToB64(buf) {
+            return btoa(String.fromCharCode(...new Uint8Array(buf)));
+        }
+
+        function b64ToBuf(b64) {
+            return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+        }
+
+        async function e2eeInit() {
+            e2eeKeyPair = await crypto.subtle.generateKey(
+                { name: 'ECDH', namedCurve: 'P-256' },
+                true,
+                ['deriveKey']
+            );
+        }
+
+        async function e2eeExportPublicKey() {
+            return await crypto.subtle.exportKey('jwk', e2eeKeyPair.publicKey);
+        }
+
+        async function e2eeImportPublicKey(jwk) {
+            return await crypto.subtle.importKey(
+                'jwk', jwk,
+                { name: 'ECDH', namedCurve: 'P-256' },
+                true, []
+            );
+        }
+
+        async function e2eeDeriveSharedKey(peerPublicKey) {
+            return await crypto.subtle.deriveKey(
+                { name: 'ECDH', public: peerPublicKey },
+                e2eeKeyPair.privateKey,
+                { name: 'AES-GCM', length: 256 },
+                false,
+                ['wrapKey', 'unwrapKey']
+            );
+        }
+
+        async function e2eeGenerateRoomKey() {
+            return await crypto.subtle.generateKey(
+                { name: 'AES-GCM', length: 256 },
+                true,
+                ['encrypt', 'decrypt']
+            );
+        }
+
+        async function e2eeWrapRoomKey(roomKey, sharedKey) {
+            const iv = crypto.getRandomValues(new Uint8Array(12));
+            const wrapped = await crypto.subtle.wrapKey('raw', roomKey, sharedKey, { name: 'AES-GCM', iv });
+            return { wrappedKey: bufToB64(wrapped), iv: bufToB64(iv) };
+        }
+
+        async function e2eeUnwrapRoomKey(wrappedKeyB64, ivB64, sharedKey) {
+            const wrappedKey = b64ToBuf(wrappedKeyB64);
+            const iv = b64ToBuf(ivB64);
+            return await crypto.subtle.unwrapKey(
+                'raw', wrappedKey, sharedKey,
+                { name: 'AES-GCM', iv },
+                { name: 'AES-GCM', length: 256 },
+                false, ['encrypt', 'decrypt']
+            );
+        }
+
+        async function e2eeEncryptText(text) {
+            const iv = crypto.getRandomValues(new Uint8Array(12));
+            const ct = await crypto.subtle.encrypt(
+                { name: 'AES-GCM', iv },
+                e2eeRoomKey,
+                new TextEncoder().encode(text)
+            );
+            return JSON.stringify({ e2ee: 1, iv: bufToB64(iv), ct: bufToB64(new Uint8Array(ct)) });
+        }
+
+        async function e2eeDecryptText(data) {
+            if (!e2eeRoomKey || !data) return data;
+            try {
+                const parsed = JSON.parse(data);
+                if (!parsed.e2ee) return data;
+                const pt = await crypto.subtle.decrypt(
+                    { name: 'AES-GCM', iv: b64ToBuf(parsed.iv) },
+                    e2eeRoomKey,
+                    b64ToBuf(parsed.ct)
+                );
+                return new TextDecoder().decode(pt);
+            } catch {
+                return '🔒 [Encrypted — from a different session]';
+            }
+        }
+
+        async function decryptIncomingMessage(entry) {
+            if (!entry || typeof entry !== 'object') return entry;
+
+            const next = { ...entry };
+
+            if (next.kind === 'text' && next.message) {
+                next.message = await e2eeDecryptText(next.message);
+            }
+
+            if (next.kind === 'attachment' && next.attachment?.originalNameEncrypted) {
+                next.attachment = { ...next.attachment };
+                next.attachment.originalName = await e2eeDecryptText(next.attachment.originalName);
+            }
+
+            return next;
+        }
+
+        async function e2eeEncryptFile(arrayBuffer) {
+            const iv = crypto.getRandomValues(new Uint8Array(12));
+            const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, e2eeRoomKey, arrayBuffer);
+            const combined = new Uint8Array(12 + ct.byteLength);
+            combined.set(iv, 0);
+            combined.set(new Uint8Array(ct), 12);
+            return combined.buffer;
+        }
+
+        async function e2eeDecryptFile(arrayBuffer) {
+            const bytes = new Uint8Array(arrayBuffer);
+            const iv = bytes.slice(0, 12);
+            const ct = bytes.slice(12);
+            return await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, e2eeRoomKey, ct);
+        }
+
+        function e2eeMarkReady() {
+            document.getElementById('e2eeIndicator').textContent = '🔒 End-to-end encrypted';
+            setChatAvailability();
+            if (!e2eeChatLoaded) {
+                e2eeChatLoaded = true;
+                loadChatMessages().catch(e => console.error('Error loading messages:', e));
+            }
+        }
+        // ============ END E2EE ============
+
+        function setChatAvailability() {
+            const input = document.getElementById('chatInput');
+            const sendBtn = document.querySelector('.chat-input button:last-of-type');
+            const attachmentBtn = document.querySelector('.attachment-btn');
+            const disabled = !e2eeRoomKey || chatBanned || (roomChatLocked && !isHost);
+
+            input.disabled = disabled;
+            sendBtn.disabled = disabled;
+            attachmentBtn.disabled = disabled;
+
+            if (!e2eeRoomKey) {
+                input.placeholder = 'Establishing secure channel...';
+            } else if (chatBanned) {
+                input.placeholder = 'Chat disabled by host';
+            } else if (roomChatLocked) {
+                input.placeholder = isHost ? 'Chat locked for participants' : 'Chat is locked by host';
+            } else {
+                input.placeholder = 'Type a message...';
+            }
+        }
+
         function toggleRoomChat(){
             const action = roomChatLocked ? 'unlock-chat' : 'lock-chat';
             socket.emit('host-room-control', { room, action });
             roomChatLocked = !roomChatLocked;
+            setChatAvailability();
             const btn = document.getElementById('lockChatBtn');
             if (btn){
                 btn.textContent = roomChatLocked ? '🔓' : '🔒';
@@ -445,26 +607,43 @@
             const by = byName || 'Host';
             if (action === 'lock-chat'){
                 roomChatLocked = true;
-                if (!chatBanned){
-                    const input = document.getElementById('chatInput');
-                    input.disabled = true;
-                    input.placeholder = 'Chat is locked by host';
-                    document.querySelector('.chat-input button:last-of-type').disabled = true;
-                    document.querySelector('.attachment-btn').disabled = true;
-                }
+                setChatAvailability();
                 showHostNotification(`${by} locked the chat for everyone!`);
             } else if (action === 'unlock-chat'){
                 roomChatLocked = false;
-                if (!chatBanned){
-                    const input = document.getElementById('chatInput');
-                    input.disabled = false;
-                    input.placeholder = 'Type a message...';
-                    document.querySelector('.chat-input button:last-of-type').disabled = false;
-                    document.querySelector('.attachment-btn').disabled = false;
-                }
+                setChatAvailability();
                 showHostNotification(`${by} unlocked the chat for everyone!`);
             }
         })
+
+        // E2EE: host receives a peer's public key and sends back the wrapped room key
+        socket.on('e2ee-public-key', async ({ from, pubKey: peerPubJwk }) => {
+            if (!isHost || !e2eeRoomKey) return;
+            try {
+                const peerPubKey = await e2eeImportPublicKey(peerPubJwk);
+                const sharedKey = await e2eeDeriveSharedKey(peerPubKey);
+                const { wrappedKey, iv } = await e2eeWrapRoomKey(e2eeRoomKey, sharedKey);
+                const myPubKey = await e2eeExportPublicKey();
+                socket.emit('e2ee-key-offer', { to: from, wrappedKey, iv, hostPubKey: myPubKey });
+            } catch (err) {
+                console.error('E2EE: failed to issue key offer:', err);
+            }
+        });
+
+        // E2EE: participant receives the wrapped room key from host
+        socket.on('e2ee-key-offer', async ({ wrappedKey, iv, hostPubKey: hostPubJwk }) => {
+            if (e2eeRoomKey) return;
+            try {
+                const hostPubKey = await e2eeImportPublicKey(hostPubJwk);
+                const sharedKey = await e2eeDeriveSharedKey(hostPubKey);
+                e2eeRoomKey = await e2eeUnwrapRoomKey(wrappedKey, iv, sharedKey);
+                e2eeMarkReady();
+                console.log('E2EE: secure channel established');
+            } catch (err) {
+                console.error('E2EE: failed to unwrap room key:', err);
+            }
+        });
+
         function setTileCameraState(tileId, userName, isOff) {
             const wrapper = document.getElementById(tileId);
             if (!wrapper) return;
@@ -500,32 +679,6 @@
                 userNames['local'] = currentUser.name;
 
                 // Get camera preview for lobby
-                                try {
-                                    const mRes = await fetch(`/api/meetings/${room}`, {
-                                        headers: { 'Authorization': `Bearer ${token}` }
-                                    });
-                                    if (mRes.ok) {
-                                        meetingInfo = await mRes.json();
-                                        isHost = meetingInfo.hostId === currentUser.id;
-                                    }
-                                } catch { /* disposable instant room — no DB record */ }
-                                
-                                // Check if we're the host (works for both scheduled and instant rooms)
-                                try {
-                                    const hRes = await fetch(`/api/meetings/${room}/host-check`, {
-                                        headers: { 'Authorization': `Bearer ${token}` }
-                                    });
-                                    if (hRes.ok) {
-                                        const hData = await hRes.json();
-                                        isHost = hData.isHost;
-                                    }
-                                } catch { /* error checking host status */ }
-                                
-                                if (isHost) {
-                                    document.getElementById('lockChatBtn').style.display = '';
-                                }
-
-                                // Get camera preview for lobby
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 localStream = stream;
                 document.getElementById('lobbyVideo').srcObject = stream;
@@ -596,14 +749,33 @@
                 setTileCameraState('tile-local', currentUser.name + ' (You)', !camEnabled);
 
                 // Join socket room
-                socket.emit('join-room', room, currentUser.id, currentUser.name);
+                socket.emit('join-room', room, currentUser.id, currentUser.name, async ({ isHost: hostFlag } = {}) => {
+                    isHost = !!hostFlag;
+                    if (hostFlag) {
+                        document.getElementById('lockChatBtn').style.display = '';
+                    }
+                    // Initialize E2EE key pair
+                    await e2eeInit();
+                    if (isHost) {
+                        // Host generates the session room key immediately
+                        e2eeRoomKey = await e2eeGenerateRoomKey();
+                        e2eeMarkReady();
+                    }
+                    // Broadcast our public key so the host can send us the room key
+                    const myPubKey = await e2eeExportPublicKey();
+                    socket.emit('e2ee-public-key', { room, pubKey: myPubKey });
+                    // Retry if no key offer arrives within 3 s (handles timing race)
+                    if (!isHost) {
+                        setTimeout(() => {
+                            if (!e2eeRoomKey) socket.emit('e2ee-public-key', { room, pubKey: myPubKey });
+                        }, 3000);
+                    }
+                });
                 socket.emit('camera-state', { room, isOff: !camEnabled });
 
                 // Set initial grid layout (just local video = p1)
                 updateGrid();
-
-                // Load persisted chat messages
-                try { await loadChatMessages(); } catch (e) { /* no persisted messages */ }
+                // Chat messages are loaded once E2EE key is established (see e2eeMarkReady)
             } catch (error) {
                 console.error('Error joining call:', error);
             }
@@ -770,8 +942,9 @@
             updateGrid();
         });
 
-        socket.on("receive-message", (data) => {
-            addMessageToChat(data);
+        socket.on("receive-message", async (data) => {
+            const decrypted = await decryptIncomingMessage(data);
+            addMessageToChat(decrypted);
         });
 
         socket.on('camera-state', ({ from, isOff }) => {
@@ -800,21 +973,11 @@
                 leaveMeeting();
             } else if (action === 'disable-chat') {
                 chatBanned = true;
-                const input = document.getElementById('chatInput');
-                input.disabled = true;
-                input.placeholder = 'Chat disabled by host';
-                document.querySelector('.chat-input button:last-of-type').disabled = true;
-                document.querySelector('.attachment-btn').disabled = true;
+                setChatAvailability();
                 showHostNotification(`${by} disabled your chat`);
             } else if (action === 'enable-chat') {
                 chatBanned = false;
-                if (!roomChatLocked){
-                    const input = document.getElementById('chatInput');
-                    input.disabled = false;
-                    input.placeholder = 'Type a message...';
-                    document.querySelector('.chat-input button:last-of-type').disabled = false;
-                    document.querySelector('.attachment-btn').disabled = false;
-                }
+                setChatAvailability();
                 showHostNotification(`${by} re-enabled your chat`);
             }
         });
@@ -922,8 +1085,11 @@
                 const response = await fetch(`/api/meetings/${room}/messages`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                const messages = await response.json();
-                messages.forEach(msg => addMessageToChat(msg));
+                const msgs = await response.json();
+                for (const msg of msgs) {
+                    const decrypted = await decryptIncomingMessage(msg);
+                    addMessageToChat(decrypted);
+                }
             } catch (err) {
                 console.error('Error loading messages:', err);
             }
@@ -945,6 +1111,90 @@
             return `${(size / (1024 * 1024)).toFixed(1)} MB`;
         }
 
+        async function downloadAttachment(storedName, fileName) {
+            try {
+            const endpoint = `/api/meetings/${encodeURIComponent(room)}/attachments/${encodeURIComponent(storedName || '')}`;
+            const resolved = new URL(endpoint, window.location.origin);
+            const resolvedUrl = resolved.toString();
+            const fallbackRelativeUrl = `${resolved.pathname}${resolved.search}`;
+            console.log('Downloading:', { endpoint, url: resolvedUrl, fallbackRelativeUrl, fileName });
+
+                let response;
+                try {
+                    response = await fetch(resolvedUrl, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                } catch (firstErr) {
+                    // Retry with same-origin relative path if absolute URL fetch fails.
+                    response = await fetch(fallbackRelativeUrl, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                }
+
+                console.log('Download response status:', response.status);
+
+                if (!response.ok) {
+                    const payload = await response.json().catch(() => null);
+                    const errorMsg = payload?.error || `Failed to download attachment (${response.status})`;
+                    console.error('Download failed:', errorMsg);
+                    throw new Error(errorMsg);
+                }
+
+                const encryptedBuffer = await response.arrayBuffer();
+                let finalBuffer;
+                if (e2eeRoomKey) {
+                    try {
+                        finalBuffer = await e2eeDecryptFile(encryptedBuffer);
+                    } catch (err) {
+                        throw new Error('Could not decrypt attachment — it may be from a different session');
+                    }
+                } else {
+                    finalBuffer = encryptedBuffer;
+                }
+
+                const downloadUrl = URL.createObjectURL(new Blob([finalBuffer]));
+                const link = document.createElement('a');
+                link.href = downloadUrl;
+                link.download = fileName || 'attachment';
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(downloadUrl);
+                console.log('Download completed');
+            } catch (err) {
+                console.error('Download error:', err);
+                alert(err.message);
+            }
+        }
+
+        function utf8ToBase64(value) {
+            return btoa(unescape(encodeURIComponent(value || '')));
+        }
+
+        function base64ToUtf8(value) {
+            return decodeURIComponent(escape(atob(value || '')));
+        }
+
+        function downloadAttachmentFromLink(event) {
+            event.preventDefault();
+            const link = event.currentTarget;
+            const storedName = base64ToUtf8(link.dataset.storedNameB64 || '');
+            const urlFallback = base64ToUtf8(link.dataset.urlB64 || '');
+            const fileName = base64ToUtf8(link.dataset.nameB64 || '') || 'attachment';
+            if (storedName) {
+                downloadAttachment(storedName, fileName);
+                return;
+            }
+            if (urlFallback) {
+                const filePart = urlFallback.split('/attachments/')[1] || '';
+                if (filePart) {
+                    downloadAttachment(decodeURIComponent(filePart), fileName);
+                    return;
+                }
+            }
+            alert('Attachment identifier is missing');
+        }
+
         function addMessageToChat(entryOrUser, messageText) {
             const entry = typeof entryOrUser === 'object'
                 ? entryOrUser
@@ -956,8 +1206,11 @@
             let body = escapeHtml(entry.message || '');
 
             if (entry.kind === 'attachment' && entry.attachment) {
+                const encodedStoredName = utf8ToBase64(entry.attachment.storedName || '');
+                const encodedUrl = utf8ToBase64(entry.attachment.url || '');
+                const encodedName = utf8ToBase64(entry.attachment.originalName || 'attachment');
                 body = `
-                    <a class="message-attachment" href="${entry.attachment.url}" target="_blank" rel="noopener noreferrer">
+                    <a class="message-attachment" href="#" data-stored-name-b64="${encodedStoredName}" data-url-b64="${encodedUrl}" data-name-b64="${encodedName}" onclick="downloadAttachmentFromLink(event)">
                         <span>📎</span>
                         <span>${escapeHtml(entry.attachment.originalName)}</span>
                     </a>
@@ -975,36 +1228,51 @@
         }
 
         async function sendMessage() {
-            if (chatBanned || roomChatLocked) return;
+            if (!e2eeRoomKey || chatBanned || (roomChatLocked && !isHost)) return;
             const input = document.getElementById('chatInput');
             const message = input.value.trim();
 
             if (!message) return;
 
             try {
-                await fetch(`/api/meetings/${room}/messages`, {
+                const encrypted = await e2eeEncryptText(message);
+
+                const response = await fetch(`/api/meetings/${room}/messages`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${token}`
                     },
-                    body: JSON.stringify({ message })
+                    body: JSON.stringify({ message: encrypted })
                 });
 
-                socket.emit('send-message', { room, message });
+                if (!response.ok) {
+                    const payload = await response.json().catch(() => null);
+                    throw new Error(payload?.error || 'Failed to send message');
+                }
+
+                socket.emit('send-message', { room, message: encrypted });
                 input.value = '';
             } catch (err) {
+                alert(err.message);
                 console.error('Error sending message:', err);
             }
         }
 
         function openAttachmentPicker() {
+            if (!e2eeRoomKey || chatBanned || (roomChatLocked && !isHost)) return;
             chatFileInput.click();
         }
 
         async function handleAttachmentSelected(event) {
             const file = event.target.files?.[0];
             if (!file) return;
+
+            if (!e2eeRoomKey || chatBanned || (roomChatLocked && !isHost)) {
+                alert(!e2eeRoomKey ? 'Secure channel not ready yet.' : chatBanned ? 'Your chat is disabled.' : 'Chat is locked right now.');
+                event.target.value = '';
+                return;
+            }
 
             if (file.size > 10 * 1024 * 1024) {
                 alert('File must be 10MB or smaller.');
@@ -1013,8 +1281,19 @@
             }
 
             try {
+                // Encrypt file content client-side before uploading
+                const arrayBuffer = await file.arrayBuffer();
+                const encryptedBuffer = await e2eeEncryptFile(arrayBuffer);
+                const encryptedBlob = new Blob([encryptedBuffer], { type: 'application/octet-stream' });
+                const encryptedOriginalName = await e2eeEncryptText(file.name);
+
                 const formData = new FormData();
-                formData.append('file', file);
+                formData.append('file', encryptedBlob, file.name);
+                // Pass original metadata so server can report correct type/size in the message
+                formData.append('mimeType', file.type || 'application/octet-stream');
+                formData.append('fileSize', String(file.size));
+                formData.append('originalName', encryptedOriginalName);
+                formData.append('originalNameEncrypted', '1');
 
                 const response = await fetch(`/api/meetings/${room}/attachments`, {
                     method: 'POST',
@@ -1024,9 +1303,9 @@
                     body: formData
                 });
 
-                const payload = await response.json();
+                const payload = await response.json().catch(() => null);
                 if (!response.ok) {
-                    throw new Error(payload.error || 'Failed to upload attachment');
+                    throw new Error(payload?.error || 'Failed to upload attachment');
                 }
             } catch (err) {
                 alert(err.message);

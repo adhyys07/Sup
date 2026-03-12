@@ -110,7 +110,7 @@ const uploadAttachment = multer({
     limits: { fileSize: MAX_ATTACHMENT_BYTES }
 });
 
-function buildAttachmentMessage(roomCode, userId, userName, file) {
+function buildAttachmentMessage(roomCode, userId, userName, file, overrides = {}) {
     return {
         id: `attachment-${randomUUID()}`,
         kind: 'attachment',
@@ -120,10 +120,11 @@ function buildAttachmentMessage(roomCode, userId, userName, file) {
         createdAt: new Date().toISOString(),
         attachment: {
             id: randomUUID(),
-            originalName: file.originalname,
+            originalName: overrides.originalName || file.originalname,
+            originalNameEncrypted: overrides.originalNameEncrypted === '1',
             storedName: file.filename,
-            mimeType: file.mimetype,
-            size: file.size,
+            mimeType: overrides.mimeType || file.mimetype,
+            size: overrides.size ? parseInt(overrides.size, 10) : file.size,
             url: `/api/meetings/${encodeURIComponent(roomCode)}/attachments/${encodeURIComponent(file.filename)}`
         }
     };
@@ -189,7 +190,11 @@ async function isHostForRoom(userId, roomCode) {
         .from(meetings)
         .where(eq(meetings.meetingCode, roomCode));
 
-    return result.length > 0 && result[0].hostId === userId;
+    if (result.length > 0) {
+        return result[0].hostId === userId;
+    }
+
+    return instantRoomHosts.get(roomCode) === userId;
 }
 // ============ PASSPORT CONFIG ============
 async function findOrCreateOAuthUser(profile, provider) {
@@ -568,17 +573,27 @@ app.post('/api/meetings/:code/join', verifyToken, async (req, res) => {
 app.post('/api/meetings/:code/messages', verifyToken, async (req, res) => {
     try {
         const { message } = req.body;
-        const meetingResult = await db.select().from(meetings).where(eq(meetings.meetingCode, req.params.code));
-        
-        if (meetingResult.length === 0) {
-            return res.status(404).json({ error: 'Meeting not found' });
+        const roomCode = req.params.code;
+        const hostOk = await isHostForRoom(req.userId, roomCode);
+
+        if (roomChatLocked.get(roomCode) && !hostOk) {
+            return res.status(403).json({ error: 'Chat is locked for this room' });
+        }
+
+        const bannedSet = roomChatBanned.get(roomCode);
+        if (bannedSet && bannedSet.has(req.userId)) {
+            return res.status(403).json({ error: 'Your chat is disabled in this room' });
         }
         
-        await db.insert(messages).values({
-            meetingId: meetingResult[0].id,
-            userId: req.userId,
-            message
-        });
+        const meetingResult = await db.select().from(meetings).where(eq(meetings.meetingCode, roomCode));
+        
+        if (meetingResult.length > 0) {
+            await db.insert(messages).values({
+                meetingId: meetingResult[0].id,
+                userId: req.userId,
+                message
+            });
+        }
         
         res.json({ success: true });
     } catch (err) {
@@ -603,35 +618,71 @@ app.post('/api/meetings/:code/attachments', verifyToken, (req, res, next) => {
         }
 
         const roomCode = req.params.code;
-        const userResult = await db.select({ name: users.name }).from(users).where(eq(users.id, req.userId));
-        const attachmentMessage = buildAttachmentMessage(roomCode, req.userId, userResult[0]?.name, req.file);
-        const roomMessages = roomRuntimeMessages.get(roomCode) || [];
-        roomMessages.push(attachmentMessage);
-        roomRuntimeMessages.set(roomCode, roomMessages);
+        const hostOk = await isHostForRoom(req.userId, roomCode);
 
-        io.to(roomCode).emit('receive-message', attachmentMessage);
-        res.json(attachmentMessage);
+        if (roomChatLocked.get(roomCode) && !hostOk) {
+            return res.status(403).json({ error: 'Chat is locked for this room' });
+        }
+
+        const bannedSet = roomChatBanned.get(roomCode);
+        if (bannedSet && bannedSet.has(req.userId)) {
+            return res.status(403).json({ error: 'Your chat is disabled in this room' });
+        }
+
+        try {
+            const userResult = await db.select({ name: users.name }).from(users).where(eq(users.id, req.userId));
+            if (!userResult || userResult.length === 0) {
+                return res.status(400).json({ error: 'User not found' });
+            }
+
+            const attachmentMessage = buildAttachmentMessage(roomCode, req.userId, userResult[0]?.name, req.file, {
+                mimeType: req.body.mimeType,
+                size: req.body.fileSize,
+                originalName: req.body.originalName,
+                originalNameEncrypted: req.body.originalNameEncrypted
+            });
+            const roomMessages = roomRuntimeMessages.get(roomCode) || [];
+            roomMessages.push(attachmentMessage);
+            roomRuntimeMessages.set(roomCode, roomMessages);
+
+            io.to(roomCode).emit('receive-message', attachmentMessage);
+            res.json(attachmentMessage);
+        } catch (dbErr) {
+            console.error('Attachment processing error:', dbErr);
+            res.status(500).json({ error: 'Failed to process attachment' });
+        }
     } catch (err) {
+        console.error('Attachment route error:', err);
         res.status(400).json({ error: err.message });
     }
 });
 
 app.get('/api/meetings/:code/attachments/:fileName', verifyToken, (req, res) => {
-    const roomCode = req.params.code;
-    const fileName = req.params.fileName;
-    const runtimeMessages = roomRuntimeMessages.get(roomCode) || [];
-    const attachmentMessage = runtimeMessages.find((entry) => entry.kind === 'attachment' && entry.attachment?.storedName === fileName);
+    try {
+        const roomCode = req.params.code;
+        const fileName = req.params.fileName;
+        const filePath = path.join(getRoomAttachmentDir(roomCode), fileName);
 
-    if (!attachmentMessage) {
-        return res.status(404).json({ error: 'Attachment not found' });
+        console.log('Download request:', { roomCode, fileName, filePath });
+
+        if (!fs.existsSync(filePath)) {
+            console.log('File not found:', filePath);
+            return res.status(404).json({ error: 'Attachment not found' });
+        }
+
+        const stats = fs.statSync(filePath);
+        if (!stats.isFile()) {
+            console.log('Not a file:', filePath);
+            return res.status(404).json({ error: 'Invalid attachment' });
+        }
+
+        res.setHeader('Content-Type', 'application/octet-stream');
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+        res.sendFile(filePath);
+    } catch (err) {
+        console.error('Download error:', err);
+        res.status(500).json({ error: 'Failed to download attachment: ' + err.message });
     }
-
-    const filePath = path.join(getRoomAttachmentDir(roomCode), fileName);
-    if (!fs.existsSync(filePath)) {
-        return res.status(404).json({ error: 'Attachment file not found' });
-    }
-
-    res.download(filePath, attachmentMessage.attachment.originalName);
 });
 
 app.get('/api/meetings/:code/messages', verifyToken, async (req, res) => {
@@ -710,7 +761,7 @@ app.get('/join/:code', (req, res) => {
 const connectedUsers = {};
 
 io.on('connection', (socket) => {
-    socket.on('join-room', async (room, userId, userName) => {
+    socket.on('join-room', async (room, userId, userName, ack) => {
         const roomBefore = io.sockets.adapter.rooms.get(room);
         const isFirstJoiner = !roomBefore || roomBefore.size === 0;
         
@@ -718,16 +769,22 @@ io.on('connection', (socket) => {
         socket.join(room);
         connectedUsers[socket.id] = { userId, room, name: userName || 'User' };
         
-        // If first joiner, check if this is an instant room (no DB record)
-        if (isFirstJoiner) {
-            const dbMeeting = await db.select().from(meetings).where(eq(meetings.meetingCode, room));
-            if (dbMeeting.length === 0) {
-                // Ad-hoc meeting, first joiner is host
-                instantRoomHosts.set(room, userId);
-            }
+        let isHost = false;
+        // Check DB first for scheduled meetings
+        const dbMeeting = await db.select({ hostId: meetings.hostId }).from(meetings).where(eq(meetings.meetingCode, room));
+        if (dbMeeting.length > 0) {
+            isHost = dbMeeting[0].hostId === userId;
+        } else if (isFirstJoiner) {
+            // Ad-hoc meeting, first joiner is host
+            instantRoomHosts.set(room, userId);
+            isHost = true;
+        } else {
+            // Arriving later at an instant meeting
+            isHost = instantRoomHosts.get(room) === userId;
         }
         
         socket.to(room).emit('user-joined', socket.id, userName);
+        if (typeof ack === 'function') ack({ isHost });
 
         db.update(meetings)
             .set({ startedAt: new Date(), endedAt: null, updatedAt: new Date() })
@@ -745,26 +802,26 @@ io.on('connection', (socket) => {
     });
 
     socket.on('send-message', async (data) => {
-    const actor = connectedUsers[socket.id];
-    if (!actor || actor.room !== data.room) return;
+        const actor = connectedUsers[socket.id];
+        if (!actor || actor.room !== data.room) return;
 
-    const banned = roomChatBanned.get(data.room);
-    if (banned && banned.has(actor.userId)) return;
+        const banned = roomChatBanned.get(data.room);
+        if (banned && banned.has(actor.userId)) return;
 
-    if (roomChatLocked.get(data.room)) {
-        const hostOk = await isHostForRoom(actor.userId, data.room);
-        if (!hostOk) return;
-    }
+        if (roomChatLocked.get(data.room)) {
+            const hostOk = await isHostForRoom(actor.userId, data.room);
+            if (!hostOk) return;
+        }
 
-    io.to(data.room).emit('receive-message', {
-        from: socket.id,
-        userId: actor.userId,
-        name: actor.name || 'User',
-        kind: 'text',
-        message: data.message,
-        createdAt: new Date().toISOString()
+        io.to(data.room).emit('receive-message', {
+            from: socket.id,
+            userId: actor.userId,
+            name: actor.name || 'User',
+            kind: 'text',
+            message: data.message,
+            createdAt: new Date().toISOString()
+        });
     });
-});
 
     socket.on('camera-state', (data) => {
         socket.to(data.room).emit('camera-state', {
@@ -814,7 +871,21 @@ io.on('connection', (socket) => {
         } else {
             roomChatLocked.delete(room);
         }
-        socket.to
+        socket.to(room).emit('host-room-control', { action, byName: actor.name || 'Host' });
+    });
+
+    // E2EE: relay a participant's public key to the rest of the room
+    socket.on('e2ee-public-key', ({ room, pubKey }) => {
+        const actor = connectedUsers[socket.id];
+        if (!actor || actor.room !== room) return;
+        socket.to(room).emit('e2ee-public-key', { from: socket.id, pubKey });
+    });
+
+    // E2EE: relay the host's wrapped room-key offer to a specific recipient
+    socket.on('e2ee-key-offer', ({ to, wrappedKey, iv, hostPubKey }) => {
+        const actor = connectedUsers[socket.id];
+        if (!actor) return;
+        io.to(to).emit('e2ee-key-offer', { from: socket.id, wrappedKey, iv, hostPubKey });
     });
 
     socket.on('disconnect', () => {
