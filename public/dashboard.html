@@ -365,26 +365,39 @@
         function renderMeetings() {
             const grid = document.getElementById('meetingsGrid');
             
-            if (userMeetings.length === 0) {
+            if (!Array.isArray(userMeetings) || userMeetings.length === 0) {
                 grid.innerHTML = '<div class="empty-state">No meetings yet. Create one to get started!</div>';
                 return;
             }
 
-            grid.innerHTML = userMeetings.map(meeting => `
-                <div class="meeting-card">
-                    <div class="meeting-title">${meeting.title || 'Unnamed Meeting'}</div>
-                    <div class="meeting-code">${meeting.meeting_code}</div>
-                    <div class="meeting-host">Host: ${meeting.host_name}</div>
-                    <div class="card-buttons">
-                        <button class="btn-primary" onclick="joinMeetingByCode('${meeting.meeting_code}')">Join</button>
-                        <button class="btn-secondary" onclick="copyToClipboard('${meeting.meeting_code}')">Copy Code</button>
-                    </div>
-                </div>
-            `).join('');
+            grid.innerHTML = userMeetings.map(function (meeting) {
+                const code = meeting.meetingCode || '';
+                const title = meeting.title || 'Unnamed Meeting';
+                const host = meeting.hostName || 'Unknown';
+                const scheduled = meeting.scheduledTime
+                    ? '<div class="meeting-host">Scheduled: ' + formatLocalDateTime(meeting.scheduledTime) + '</div>'
+                    : '<div class="meeting-host">Instant meeting</div>';
+
+                return ''
+                     '<div class="meeting-card">'
+                       '<div class="meeting-title">' + escapeHtml(title) + '</div>'
+                       '<div class="meeting-code">' + escapeHtml(code) + '</div>'
+                       '<div class="meeting-host">Host: ' + escapeHtml(host) + '</div>'
+                       scheduled
+                       '<div class="card-buttons">'
+                         '<button class="btn-primary" onclick="joinMeetingByCode(\'' + code + '\')">Join</button>'
+                         '<button class="btn-secondary" onclick="copyToClipboard(\'' + code + '\')">Copy Code</button>'
+                       '</div>'
+                       '<div class="card-buttons" style="margin-top:8px;">'
+                         '<button class="btn-secondary" onclick="addToGoogleCalendar(\'' + code + '\')">Google Calendar</button>'
+                         '<button class="btn-secondary" onclick="downloadICS(\'' + code + '\')">Download ICS</button>'
+                       '</div>'
+                     '</div>';
+    }).join('');
         }
 
         async function createMeeting() {
-            const title = document.getElementById('meetingTitle').value;
+            const title = document.getElementById('meetingTitle').value.trim();
             const time = document.getElementById('meetingTime').value;
 
             try {
@@ -392,7 +405,7 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
+                        'Authorization': 'Bearer ' + token
                     },
                     body: JSON.stringify({
                         title: title || 'Meeting',
@@ -400,14 +413,124 @@
                     })
                 });
 
-                const meeting = await response.json();
+                const payload = await response.json();
+                if (!response.ok) {
+                    throw new Error(payload.error || 'Failed to create meeting');
+                }
                 closeModal('createMeetingModal');
                 document.getElementById('meetingTitle').value = '';
                 document.getElementById('meetingTime').value = '';
-                window.location.href = `/meeting.html?room=${meeting.meeting_code}`;
+
+                if (time) {
+                    await fetchMeetings();
+                    alert('Meeting scheduled successfully!');
+                } else {
+                    window.location.href = '/meeting.html?room=' + payload.meetingCode;
+                }
             } catch (err) {
-                alert('Error creating meeting: ' + err.message);
+                alert('Error creating meeting:', err.message);
             }
+        }
+
+        function escapeHtml(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function formatLocalDateTime(value) {
+            const d = new Date(value);
+            return d.toLocaleString([], {
+                year: 'numeric',
+                month: 'short',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function getMeetingByCode(code) {
+            return (userMeetings || []).find(function (m) {
+                return m.meetingCode === code;
+            });
+        }
+
+        function toGoogleDateUTC(dateObj) {
+            return dateObj.toISOString().replace(/[-:]/g, '').replace('.000', '');
+        }
+
+        function addToGoogleCalendar(code) {
+            const meeting = getMeetingByCode(code);
+            if (!meeting) return;
+
+            const start = meeting.scheduledTime ? new Date(meeting.scheduledTime) : new Date();
+            const end = new Date(start.getTime() + 30 * 60 * 1000);
+
+            const title = meeting.title || 'Sup Meeting';
+            const joinUrl = window.location.origin + '/meeting.html?room=' + meeting.meetingCode;
+            const details = 'Join meeting: ' + joinUrl;
+
+            const url =
+                'https://calendar.google.com/calendar/render?action=TEMPLATE'
+                + '&text=' + encodeURIComponent(title)
+                + '&dates=' + encodeURIComponent(toGoogleDateUTC(start) + '/' + toGoogleDateUTC(end))
+                + '&details=' + encodeURIComponent(details);
+
+            window.open(url, '_blank');
+        }
+
+        function toICSDateUTC(dateObj) {
+            return dateObj.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+        }
+
+        function escapeICS(text) {
+            return String(text || '')
+                .replace(/\\/g, '\\\\')
+                .replace(/\n/g, '\\n')
+                .replace(/,/g, '\\,')
+                .replace(/;/g, '\\;');
+        }
+
+        function downloadICS(code) {
+            const meeting = getMeetingByCode(code);
+            if (!meeting) return;
+
+            const start = meeting.scheduledTime ? new Date(meeting.scheduledTime) : new Date();
+            const end = new Date(start.getTime() + 30 * 60 * 1000);
+            const now = new Date();
+
+            const title = meeting.title || 'Sup Meeting';
+            const joinUrl = window.location.origin + '/meeting.html?room=' + meeting.meetingCode;
+            const uid = 'sup-' + meeting.meetingCode + '-' + now.getTime() + '@sup.local';
+
+            const lines = [
+                'BEGIN:VCALENDAR',
+                'VERSION:2.0',
+                'PRODID:-//Sup//Meetings//EN',
+                'CALSCALE:GREGORIAN',
+                'METHOD:PUBLISH',
+                'BEGIN:VEVENT',
+                'UID:' + uid,
+                'DTSTAMP:' + toICSDateUTC(now),
+                'DTSTART:' + toICSDateUTC(start),
+                'DTEND:' + toICSDateUTC(end),
+                'SUMMARY:' + escapeICS(title),
+                'DESCRIPTION:' + escapeICS('Join meeting: ' + joinUrl),
+                'END:VEVENT',
+                'END:VCALENDAR'
+            ];
+
+            const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = title.replace(/\s+/g, '-').toLowerCase() + '.ics';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(a.href);
         }
 
         async function joinMeeting() {
