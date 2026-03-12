@@ -87,7 +87,24 @@
             overflow: hidden; position: relative;
             min-width: 0; min-height: 0;
         }
-        .video-wrapper video { width: 100%; height: 100%; object-fit: contain; display: block; background: #000; }
+        .video-wrapper video:not(#localCamPip) { width: 100%; height: 100%; object-fit: contain; display: block; background: #000; }
+        #localCamPip {
+            position: absolute;
+            right: 12px;
+            bottom: 44px;
+            width: 280px;
+            max-width: 45%;
+            aspect-ratio: 16 / 9;
+            height: auto;
+            object-fit: cover;
+            border-radius: 10px;
+            border: 2px solid rgba(255, 255, 255, 0.35);
+            background: #000;
+            z-index: 5;
+            transform: scaleX(-1);
+            pointer-events: none;
+            display: none;
+        }
         .video-label {
             position: absolute; bottom: 10px; left: 10px;
             background: rgba(0,0,0,0.55); color: white;
@@ -275,6 +292,7 @@
             <div class="videos-container" id="videosContainer">
                 <div class="video-wrapper" id="tile-local">
                     <video id="localVideo" autoplay muted playsinline></video>
+                    <video id="localCamPip" autoplay muted playsinline></video>
                     <div class="video-label" id="localVideoLabel">You</div>
                 </div>
             </div>
@@ -323,6 +341,7 @@
         let currentUser = null;
 
         const localVideo = document.getElementById('localVideo');
+        const localCamPip = document.getElementById('localCamPip');
         const videosContainer = document.getElementById('videosContainer');
         const chatMessages = document.getElementById('chatMessages');
 
@@ -456,6 +475,7 @@
 
                 // Assign stream to local video
                 localVideo.srcObject = localStream;
+                syncLocalCamPip();
 
                 // Update local video label with real name
                 document.getElementById('localVideoLabel').textContent = currentUser.name + ' (You)';
@@ -496,10 +516,12 @@
             if (!localStream) return;
             camEnabled = !camEnabled;
             localStream.getVideoTracks().forEach(t => t.enabled = camEnabled);
-            setTileCameraState('tile-local', (currentUser?.name || 'You') + ' (You)', !camEnabled);
+            const showCameraOff = isPresenting ? false : !camEnabled;
+            setTileCameraState('tile-local', (currentUser?.name || 'You') + ' (You)', showCameraOff);
             if (currentUser && !isPresenting) {
                 socket.emit('camera-state', { room, isOff: !camEnabled });
             }
+            syncLocalCamPip();
             syncCallControls();
         }
 
@@ -522,6 +544,20 @@
             });
         }
 
+        function syncLocalCamPip() {
+            if (!localCamPip) return;
+            const shouldShow = isPresenting && camEnabled && !!localStream?.getVideoTracks()?.length;
+            localCamPip.style.display = shouldShow ? 'block' : 'none';
+            if (shouldShow) {
+                if (localCamPip.srcObject !== localStream) {
+                    localCamPip.srcObject = localStream;
+                }
+                localCamPip.play().catch(() => {});
+            } else {
+                localCamPip.srcObject = null;
+            }
+        }
+
         async function startPresent() {
             try {
                 screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
@@ -529,12 +565,13 @@
                 if (!screenTrack) return;
                 replaceVideoTrack(screenTrack);
 
-                // Keep local tile on camera while peers receive the screen track.
-                localVideo.srcObject = localStream;
-                setTileCameraState('tile-local', (currentUser?.name || 'You') + ' (You)', !camEnabled);
+                // Show shared screen in main local view and camera as PiP.
+                localVideo.srcObject = screenStream;
+                setTileCameraState('tile-local', (currentUser?.name || 'You') + ' (You)', false);
 
                 isPresenting = true;
                 syncPresentButton();
+                syncLocalCamPip();
                 screenTrack.onended = () => stopPresent();
             } catch (err) {
                 console.error('Error starting presentation:', err);
@@ -553,6 +590,7 @@
             setTileCameraState('tile-local', (currentUser?.name || 'You') + ' (You)', !camEnabled);
             isPresenting = false;
             syncPresentButton();
+            syncLocalCamPip();
         
         }
         async function togglePresent() {
