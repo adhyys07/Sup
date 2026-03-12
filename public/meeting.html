@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meeting - Sup!</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a1a;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .header {
+            background: #222;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #333;
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        h1 {
+            color: white;
+            font-size: 20px;
+        }
+        .meeting-code {
+            background: #333;
+            color: #aaa;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-family: monospace;
+        }
+        .copy-btn {
+            background: none;
+            border: none;
+            color: #aaa;
+            cursor: pointer;
+            padding: 4px 8px;
+            font-size: 12px;
+            transition: color 0.3s;
+        }
+        .copy-btn:hover {
+            color: white;
+        }
+        .btn-leave {
+            background: #d32f2f;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+        .btn-leave:hover {
+            background: #c62828;
+        }
+        .video-container {
+            flex: 1;
+            display: flex;
+            padding: 20px;
+            gap: 20px;
+            overflow: auto;
+        }
+        .video-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 0;
+        }
+        video {
+            max-width: 100%;
+            max-height: 100%;
+            background-color: #000;
+            border-radius: 8px;
+            object-fit: cover;
+        }
+        .video-label {
+            color: #999;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+        @media (max-width: 768px) {
+            .video-container {
+                flex-direction: column;
+            }
+            .video-wrapper {
+                min-height: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <h1>Sup! Meeting</h1>
+            <div class="meeting-code" id="meetingCode"></div>
+            <button class="copy-btn" onclick="copyMeetingCode()">Copy</button>
+        </div>
+        <button class="btn-leave" onclick="leaveMeeting()">Leave</button>
+    </div>
+
+    <div class="video-container">
+        <div class="video-wrapper">
+            <video id="localVideo" autoplay muted playsinline></video>
+            <p class="video-label">You</p>
+        </div>
+        <div class="video-wrapper">
+            <video id="remoteVideo" autoplay playsinline></video>
+            <p class="video-label">Remote User</p>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        // Get room from URL parameter
+        const params = new URLSearchParams(window.location.search);
+        const room = params.get('room') || 'unknown-room';
+        
+        // Display meeting code
+        document.getElementById('meetingCode').textContent = room;
+
+        const socket = io();
+        let localStream;
+        let peerConnection;
+
+        const localVideo = document.getElementById('localVideo');
+        const remoteVideo = document.getElementById('remoteVideo');
+
+        // Initialize local stream
+        navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+            .then(stream => {
+                localStream = stream;
+                localVideo.srcObject = stream;
+                socket.emit('join-room', room);
+            })
+            .catch(error => {
+                console.error('Error accessing media devices:', error);
+                alert('Please allow access to camera and microphone');
+            });
+
+        socket.on("user-joined", async (id) => {
+            console.log("User joined:", id);
+            peerConnection = createPeerConnection(id);
+            
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            
+            socket.emit("signal", {
+                to: id,
+                signal: offer
+            });
+        });
+
+        socket.on("signal", async (data) => {
+            if (!peerConnection) {
+                peerConnection = createPeerConnection(data.from);
+            }
+            
+            if (data.signal.type === 'offer') {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.signal));
+                
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+
+                socket.emit("signal", {
+                    to: data.from,
+                    signal: answer
+                });
+            }   
+
+            if (data.signal.type === 'answer') {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.signal));
+            }
+
+            if (data.signal.candidate) {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(data.signal.candidate));
+            }
+        });
+
+        function createPeerConnection(id) {
+            const pc = new RTCPeerConnection({
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' }
+                ]
+            });
+
+            localStream.getTracks().forEach(track => {
+                pc.addTrack(track, localStream);
+            });
+
+            pc.ontrack = (event) => {
+                console.log("Received remote track:", event.track.kind);
+                remoteVideo.srcObject = event.streams[0];
+            };
+
+            pc.onicecandidate = (event) => {
+                if (event.candidate) {
+                    socket.emit("signal", {
+                        to: id,
+                        signal: {
+                            candidate: event.candidate
+                        }
+                    });
+                }
+            };
+
+            pc.onconnectionstatechange = () => {
+                console.log("Connection state:", pc.connectionState);
+            };
+
+            return pc;
+        }
+
+        function copyMeetingCode() {
+            navigator.clipboard.writeText(room).then(() => {
+                alert('Meeting code copied to clipboard!');
+            });
+        }
+
+        function leaveMeeting() {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+            }
+            if (peerConnection) {
+                peerConnection.close();
+            }
+            socket.disconnect();
+            window.location.href = '/';
+        }
+    </script>
+</body>
+</html>

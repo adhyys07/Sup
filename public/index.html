@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sup! Video Call</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            text-align: center;
+            max-width: 450px;
+            width: 90%;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 32px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+        .button-group {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        button {
+            padding: 14px 24px;
+            font-size: 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        .btn-create {
+            background: #667eea;
+            color: white;
+        }
+        .btn-create:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(102, 126, 234, 0.4);
+        }
+        .btn-join {
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+        .btn-join:hover {
+            background: #f5f5f5;
+        }
+        .join-form {
+            display: none;
+            margin-top: 20px;
+        }
+        .join-form.active {
+            display: block;
+        }
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .join-form button {
+            padding: 12px 24px;
+            background: #667eea;
+            color: white;
+        }
+        .join-form button:hover {
+            background: #5568d3;
+        }
+        .form-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        .btn-small {
+            padding: 8px 16px;
+            font-size: 14px;
+        }
+        .btn-cancel {
+            background: #f0f0f0;
+            color: #333;
+        }
+        .btn-cancel:hover {
+            background: #e0e0e0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Sup!</h1>
+        <p class="subtitle">Video Call Platform</p>
+        
+        <div class="button-group">
+            <button class="btn-create" onclick="createMeeting()">+ New Meeting</button>
+            <button class="btn-join" onclick="toggleJoinForm()">Join Meeting</button>
+        </div>
+
+        <div class="join-form" id="joinForm">
+            <div class="input-group">
+                <input 
+                    type="text" 
+                    id="meetingId" 
+                    placeholder="Enter meeting code"
+                    onkeypress="handleKeyPress(event)"
+                >
+            </div>
+            <div class="form-buttons">
+                <button class="btn-create btn-small" onclick="joinMeeting()">Join</button>
+                <button class="btn-cancel btn-small" onclick="toggleJoinForm()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function generateMeetingId() {
+            return Math.random().toString(36).substring(2, 11).toUpperCase();
+        }
+
+        function createMeeting() {
+            const meetingId = generateMeetingId();
+            window.location.href = `/meeting.html?room=${meetingId}`;
+        }
+
+        function toggleJoinForm() {
+            const form = document.getElementById('joinForm');
+            form.classList.toggle('active');
+            if (form.classList.contains('active')) {
+                document.getElementById('meetingId').focus();
+            }
+        }
+
+        function joinMeeting() {
+            const meetingId = document.getElementById('meetingId').value.trim();
+            if (meetingId) {
+                window.location.href = `/meeting.html?room=${meetingId}`;
+            }
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                joinMeeting();
+            }
+        }
+    </script>
+</body>
+</html>
