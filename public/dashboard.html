@@ -5,163 +5,273 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - Sup!</title>
     <style>
+        :root {
+            --bg: #fff4d6;
+            --panel: rgba(255, 255, 255, 0.72);
+            --panel-solid: #fff8ff;
+            --line: rgba(113, 71, 182, 0.14);
+            --ink: #20123a;
+            --muted: #6a5d8c;
+            --brand: #ff4f87;
+            --brand-2: #6b5bff;
+            --accent: #ffd166;
+            --danger: #ff5d5d;
+            --shadow: 0 24px 70px rgba(126, 76, 196, 0.16);
+        }
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f5f5f5;
+            font-family: 'Trebuchet MS', 'Avenir Next', 'Segoe UI', sans-serif;
+            background:
+                radial-gradient(circle at 8% 14%, rgba(255, 79, 135, 0.22), transparent 24%),
+                radial-gradient(circle at 85% 10%, rgba(107, 91, 255, 0.2), transparent 22%),
+                radial-gradient(circle at 72% 78%, rgba(255, 209, 102, 0.2), transparent 20%),
+                linear-gradient(180deg, #fff7d8 0%, #ffe7f7 46%, #daf0ff 100%);
+            color: var(--ink);
             min-height: 100vh;
         }
         .navbar {
-            background: white;
-            padding: 15px 30px;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: rgba(255, 248, 255, 0.68);
+            backdrop-filter: blur(14px);
+            padding: 16px 34px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            border-bottom: 1px solid var(--line);
         }
         .navbar-left {
             display: flex;
             align-items: center;
-            gap: 30px;
+            gap: 28px;
             flex: 1;
         }
         h1 {
-            color: #667eea;
-            font-size: 24px;
+            color: var(--brand-2);
+            font-size: 28px;
+            letter-spacing: -0.03em;
+        }
+        nav {
+            display: flex;
+            gap: 12px;
         }
         nav a {
-            color: #666;
+            color: var(--muted);
             text-decoration: none;
-            font-weight: 500;
-            transition: color 0.3s;
+            font-weight: 700;
+            padding: 10px 14px;
+            border-radius: 999px;
+            transition: background 0.2s, color 0.2s;
+            font-size: 14px;
         }
         nav a:hover {
-            color: #667eea;
+            color: var(--brand-2);
+            background: rgba(107, 91, 255, 0.08);
         }
         .navbar-right {
             display: flex;
             align-items: center;
-            gap: 15px;
+            gap: 14px;
         }
         .user-info {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
         }
         .avatar {
-            width: 40px;
-            height: 40px;
+            width: 42px;
+            height: 42px;
             border-radius: 50%;
-            background: #667eea;
+            background: linear-gradient(135deg, var(--brand), var(--brand-2));
             color: white;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-weight: 600;
+            font-weight: 700;
+            box-shadow: 0 12px 20px rgba(21, 71, 52, 0.18);
         }
         .user-name {
-            color: #333;
-            font-weight: 500;
+            color: var(--ink);
+            font-weight: 700;
         }
         button {
-            padding: 10px 20px;
+            padding: 11px 18px;
             border: none;
-            border-radius: 8px;
+            border-radius: 14px;
             cursor: pointer;
-            font-weight: 600;
-            transition: all 0.3s;
+            font-weight: 700;
+            transition: transform 0.18s, filter 0.18s, background 0.18s;
+            font-family: inherit;
+        }
+        button:hover {
+            transform: translateY(-1px);
+            filter: brightness(1.03);
         }
         .btn-logout {
-            background: #d32f2f;
+            background: var(--danger);
             color: white;
-        }
-        .btn-logout:hover {
-            background: #c62828;
         }
         .btn-primary {
-            background: #667eea;
+            background: linear-gradient(135deg, var(--brand), #ff8b3d);
             color: white;
         }
-        .btn-primary:hover {
-            background: #5568d3;
-        }
         .container {
-            max-width: 1200px;
-            margin: 30px auto;
-            padding: 0 20px;
+            max-width: 1240px;
+            margin: 34px auto 48px;
+            padding: 0 22px;
         }
         .welcome-section {
-            background: white;
-            padding: 30px;
-            border-radius: 12px;
+            display: grid;
+            grid-template-columns: 1.4fr 0.8fr;
+            gap: 18px;
             margin-bottom: 30px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
-        .welcome-section h2 {
-            color: #333;
-            margin-bottom: 20px;
-            font-size: 20px;
+        .hero-card,
+        .metrics-card,
+        .meetings-section {
+            background: var(--panel);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.55);
+            border-radius: 28px;
+            box-shadow: var(--shadow);
+        }
+        .hero-card {
+            padding: 30px;
+        }
+        .hero-card h2 {
+            font-size: 40px;
+            line-height: 1.04;
+            margin-bottom: 14px;
+            letter-spacing: -0.04em;
+        }
+        .hero-card {
+            background:
+                linear-gradient(145deg, rgba(255,255,255,0.78), rgba(255,255,255,0.58)),
+                radial-gradient(circle at top right, rgba(255, 79, 135, 0.14), transparent 30%),
+                radial-gradient(circle at bottom left, rgba(107, 91, 255, 0.12), transparent 26%);
+        }
+        .hero-card p {
+            color: var(--muted);
+            font-size: 16px;
+            line-height: 1.6;
+            max-width: 620px;
         }
         .action-buttons {
             display: flex;
-            gap: 15px;
+            gap: 12px;
             flex-wrap: wrap;
+            margin-top: 24px;
         }
         .action-buttons button {
-            padding: 12px 24px;
-            font-size: 16px;
+            padding: 13px 18px;
+            font-size: 15px;
+            min-width: 154px;
+        }
+        .metrics-card {
+            padding: 24px;
+            display: grid;
+            align-content: start;
+            gap: 14px;
+        }
+        .metrics-card h3 {
+            font-size: 17px;
+            color: var(--ink);
+        }
+        .metric-list {
+            display: grid;
+            gap: 12px;
+        }
+        .metric {
+            padding: 14px 16px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.58);
+            border: 1px solid var(--line);
+        }
+        .metric-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--brand-2);
+            line-height: 1;
+            margin-bottom: 6px;
+        }
+        .metric-label {
+            font-size: 13px;
+            color: var(--muted);
+        }
+        .integration-row {
+            margin-top: 22px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            padding-top: 18px;
+            border-top: 1px solid var(--line);
+        }
+        .integration-status {
+            color: var(--muted);
+            font-size: 14px;
         }
         .meetings-section {
-            background: white;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            padding: 28px;
         }
-        .meetings-section h2 {
-            color: #333;
-            margin-bottom: 20px;
-            font-size: 20px;
+        .section-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: end;
+            gap: 14px;
+            margin-bottom: 22px;
+        }
+        .section-head h2 {
+            color: var(--ink);
+            font-size: 24px;
+            margin-bottom: 4px;
+        }
+        .section-head p {
+            color: var(--muted);
+            font-size: 14px;
         }
         .meetings-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 18px;
         }
         .meeting-card {
-            background: #f9f9f9;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.82), rgba(255,255,255,0.66));
+            border: 1px solid var(--line);
+            border-radius: 22px;
             padding: 20px;
-            transition: all 0.3s;
+            transition: transform 0.18s, box-shadow 0.18s;
         }
         .meeting-card:hover {
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            transform: translateY(-2px);
+            box-shadow: 0 18px 34px rgba(58, 46, 31, 0.12);
+            transform: translateY(-3px);
         }
         .meeting-title {
-            color: #333;
-            font-weight: 600;
+            color: var(--ink);
+            font-weight: 700;
             margin-bottom: 10px;
-            font-size: 16px;
+            font-size: 18px;
         }
         .meeting-code {
-            color: #666;
+            color: #51483d;
             font-size: 12px;
-            background: #f0f0f0;
-            padding: 8px;
-            border-radius: 4px;
-            margin-bottom: 10px;
-            font-family: monospace;
+            background: rgba(107, 91, 255, 0.08);
+            padding: 10px 12px;
+            border-radius: 16px;
+            margin-bottom: 12px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
             word-break: break-all;
+            border: 1px solid rgba(107, 91, 255, 0.1);
         }
         .meeting-host {
-            color: #999;
-            font-size: 12px;
-            margin-bottom: 15px;
+            color: var(--muted);
+            font-size: 13px;
+            margin-bottom: 12px;
         }
         .card-buttons {
             display: flex;
@@ -170,43 +280,28 @@
         }
         .card-buttons button {
             flex: 1;
-            padding: 8px;
-            font-size: 14px;
+            padding: 10px 12px;
+            font-size: 13px;
+            min-width: 110px;
         }
         .btn-secondary {
-            background: #f0f0f0;
-            color: #333;
-        }
-        .btn-secondary:hover {
-            background: #e0e0e0;
+            background: rgba(255, 255, 255, 0.78);
+            color: var(--ink);
+            border: 1px solid var(--line);
         }
         .btn-connected {
-            background: #2e7d32;
+            background: linear-gradient(135deg, #2ec4b6, #6b5bff);
             color: white;
-        }
-        .btn-connected:hover {
-            background: #256628;
-        }
-        .integration-row {
-            margin-top: 18px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            flex-wrap: wrap;
-        }
-        .integration-status {
-            color: #666;
-            font-size: 14px;
         }
         .modal {
             display: none;
             position: fixed;
-            z-index: 1;
+            z-index: 20;
             left: 0;
             top: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
+            background-color: rgba(18, 15, 11, 0.46);
         }
         .modal.active {
             display: flex;
@@ -214,36 +309,40 @@
             justify-content: center;
         }
         .modal-content {
-            background: white;
+            background: linear-gradient(180deg, #fff9ff, #fff8f0);
             padding: 30px;
-            border-radius: 12px;
+            border-radius: 22px;
             max-width: 400px;
             width: 90%;
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            box-shadow: var(--shadow);
         }
         .modal-content h2 {
             margin-bottom: 20px;
-            color: #333;
+            color: var(--ink);
         }
         .form-group {
             margin-bottom: 15px;
         }
         .form-group label {
             display: block;
-            color: #333;
-            font-weight: 600;
-            margin-bottom: 5px;
+            color: var(--ink);
+            font-weight: 700;
+            margin-bottom: 6px;
             font-size: 14px;
         }
         .form-group input {
             width: 100%;
-            padding: 10px;
-            border: 2px solid #e0e0e0;
-            border-radius: 6px;
+            padding: 12px 13px;
+            border: 1px solid rgba(58, 46, 31, 0.14);
+            border-radius: 12px;
             font-size: 14px;
+            background: rgba(255, 255, 255, 0.72);
+            font-family: inherit;
         }
         .form-group input:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: rgba(255, 79, 135, 0.35);
         }
         .modal-buttons {
             display: flex;
@@ -263,8 +362,31 @@
         }
         .empty-state {
             text-align: center;
-            padding: 40px;
-            color: #999;
+            padding: 44px;
+            color: var(--muted);
+            border: 1px dashed rgba(58, 46, 31, 0.16);
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.42);
+        }
+        @media (max-width: 960px) {
+            .welcome-section {
+                grid-template-columns: 1fr;
+            }
+        }
+        @media (max-width: 680px) {
+            .navbar {
+                padding: 14px 18px;
+                flex-wrap: wrap;
+                gap: 12px;
+            }
+            .navbar-left,
+            .navbar-right {
+                width: 100%;
+                justify-content: space-between;
+            }
+            .action-buttons button {
+                width: 100%;
+            }
         }
     </style>
 </head>
@@ -288,20 +410,45 @@
 
     <div class="container">
         <div class="welcome-section">
-            <h2>Welcome back, <span id="welcomeName">User</span>!</h2>
-            <div class="action-buttons">
-                <button class="btn-primary" onclick="instantMeeting()">Instant Meeting</button>
-                <button class="btn-primary" onclick="openCreateMeetingModal()">Schedule Meeting</button>
-                <button class="btn-primary" onclick="openJoinMeetingModal()">Join Meeting</button>
+            <div class="hero-card">
+                <h2>Run clearer meetings, <span id="welcomeName">User</span>.</h2>
+                <p>Start an instant room, schedule structured sessions, or jump back into active work with your recent meetings and built-in tools.</p>
+                <div class="action-buttons">
+                    <button class="btn-primary" onclick="instantMeeting()">Instant Meeting</button>
+                    <button class="btn-primary" onclick="openCreateMeetingModal()">Schedule Meeting</button>
+                    <button class="btn-primary" onclick="openJoinMeetingModal()">Join Meeting</button>
+                </div>
+                <div class="integration-row">
+                    <button class="btn-secondary" id="calendarConnectBtn" onclick="connectGoogleCalendar()">Connect Google Calendar</button>
+                    <div class="integration-status" id="calendarStatus">Google Calendar not connected</div>
+                </div>
             </div>
-            <div class="integration-row">
-                <button class="btn-secondary" id="calendarConnectBtn" onclick="connectGoogleCalendar()">Connect Google Calendar</button>
-                <div class="integration-status" id="calendarStatus">Google Calendar not connected</div>
+            <div class="metrics-card">
+                <h3>Workspace snapshot</h3>
+                <div class="metric-list">
+                    <div class="metric">
+                        <div class="metric-value" id="statMeetingCount">0</div>
+                        <div class="metric-label">Total meetings</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" id="statScheduledCount">0</div>
+                        <div class="metric-label">Scheduled sessions</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" id="statInstantCount">0</div>
+                        <div class="metric-label">Instant rooms</div>
+                    </div>
+                </div>
             </div>
         </div>
 
         <div class="meetings-section">
-            <h2>Your Meetings</h2>
+            <div class="section-head">
+                <div>
+                    <h2>Your Meetings</h2>
+                    <p>Recent rooms, planned sessions, and quick access to invite links.</p>
+                </div>
+            </div>
             <div class="meetings-grid" id="meetingsGrid">
                 <div class="empty-state">Loading meetings...</div>
             </div>
@@ -389,6 +536,17 @@
 
         function renderMeetings() {
             const grid = document.getElementById('meetingsGrid');
+            const meetingCountEl = document.getElementById('statMeetingCount');
+            const scheduledCountEl = document.getElementById('statScheduledCount');
+            const instantCountEl = document.getElementById('statInstantCount');
+            const totalMeetings = Array.isArray(userMeetings) ? userMeetings.length : 0;
+            const scheduledMeetings = Array.isArray(userMeetings) ? userMeetings.filter(function (meeting) {
+                return !!meeting.scheduledTime;
+            }).length : 0;
+
+            if (meetingCountEl) meetingCountEl.textContent = String(totalMeetings);
+            if (scheduledCountEl) scheduledCountEl.textContent = String(scheduledMeetings);
+            if (instantCountEl) instantCountEl.textContent = String(Math.max(0, totalMeetings - scheduledMeetings));
             
             if (!Array.isArray(userMeetings) || userMeetings.length === 0) {
                 grid.innerHTML = '<div class="empty-state">No meetings yet. Create one to get started!</div>';

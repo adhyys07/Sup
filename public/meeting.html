@@ -5,6 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Meeting - Sup!</title>
     <style>
+        :root {
+            --fun-line: rgba(255, 255, 255, 0.12);
+            --fun-text: #fff7ff;
+            --fun-muted: #c6b9ff;
+            --fun-pink: #ff4f87;
+            --fun-violet: #6b5bff;
+            --fun-cyan: #2ee6d6;
+            --fun-yellow: #ffd166;
+            --fun-danger: #ff5d5d;
+        }
         * {
             margin: 0;
             padding: 0;
@@ -13,8 +23,12 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         html, body { height: 100%; overflow: hidden; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #111;
+            font-family: 'Trebuchet MS', 'Avenir Next', 'Segoe UI', sans-serif;
+            background:
+                radial-gradient(circle at 10% 10%, rgba(255, 79, 135, 0.28), transparent 24%),
+                radial-gradient(circle at 85% 10%, rgba(46, 230, 214, 0.22), transparent 20%),
+                radial-gradient(circle at 72% 82%, rgba(255, 209, 102, 0.18), transparent 18%),
+                linear-gradient(145deg, #120f2d 0%, #221657 42%, #112443 100%);
             display: flex;
             flex-direction: column;
         }
@@ -23,36 +37,59 @@
         .header {
             flex-shrink: 0;
             height: 56px;
-            background: #1e1e1e;
+            background: rgba(22, 18, 52, 0.74);
+            backdrop-filter: blur(14px);
             padding: 0 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 1px solid #2a2a2a;
+            border-bottom: 1px solid var(--fun-line);
             z-index: 10;
         }
         .header-left { display: flex; align-items: center; gap: 12px; }
-        h1 { color: white; font-size: 18px; font-weight: 700; }
+        h1 { color: var(--fun-text); font-size: 18px; font-weight: 700; }
         .meeting-code {
-            background: #2a2a2a; color: #aaa;
-            padding: 4px 10px; border-radius: 4px;
+            background: rgba(255, 255, 255, 0.1); color: var(--fun-yellow);
+            padding: 6px 12px; border-radius: 999px;
             font-size: 12px; font-family: monospace;
+            border: 1px solid rgba(255, 255, 255, 0.08);
         }
         .copy-btn {
-            background: none; border: none; color: #aaa;
+            background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.08); color: var(--fun-text);
             cursor: pointer; padding: 4px 8px; font-size: 12px; transition: color 0.2s;
+            border-radius: 999px;
         }
-        .copy-btn:hover { color: white; }
+        .copy-btn:hover { color: white; background: rgba(255,255,255,0.14); }
         .header-right { display: flex; gap: 8px; align-items: center; }
+        .icon-svg {
+            width: 18px;
+            height: 18px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 1.9;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            flex-shrink: 0;
+            pointer-events: none;
+        }
+        .icon-svg.icon-small {
+            width: 14px;
+            height: 14px;
+        }
+        .icon-stack {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
         button {
             padding: 8px 14px; border: none; border-radius: 6px;
             cursor: pointer; font-weight: 600; transition: background 0.2s;
         }
-        .btn-leave { background: #c62828; color: white; border-radius: 20px; padding: 8px 20px; }
-        .btn-leave:hover { background: #b71c1c; }
-        .btn-toggle { background: #2a2a2a; color: white; font-size: 13px; border-radius: 20px; }
-        .btn-toggle:hover { background: #3a3a3a; }
-        .btn-toggle.active { background: #667eea; }
+        .btn-leave { background: linear-gradient(135deg, var(--fun-danger), #ff8b3d); color: white; border-radius: 999px; padding: 8px 20px; }
+        .btn-leave:hover { background: linear-gradient(135deg, #ff4776, #ff7c31); }
+        .btn-toggle { background: rgba(255,255,255,0.1); color: white; font-size: 13px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.08); }
+        .btn-toggle:hover { background: rgba(255,255,255,0.16); }
+        .btn-toggle.active { background: linear-gradient(135deg, var(--fun-pink), var(--fun-violet)); }
 
         /* ── Main layout ── */
         .main-content { flex: 1; display: flex; overflow: hidden; min-height: 0; }
@@ -60,10 +97,10 @@
         /* ── Video area ── */
         .video-section {
             flex: 1; display: flex; flex-direction: column;
-            min-width: 0; background: #111; overflow: hidden;
+            min-width: 0; background: transparent; overflow: hidden;
         }
         .videos-container {
-            flex: 1; display: grid; gap: 4px; padding: 6px;
+            flex: 1; display: grid; gap: 10px; padding: 10px;
             overflow: hidden; min-height: 0; min-width: 0;
         }
 
@@ -83,9 +120,11 @@
         .videos-container.p5 .video-wrapper:last-child { grid-column: 2 / 3; }
 
         .video-wrapper {
-            background: #1c1c1c; border-radius: 10px;
+            background: linear-gradient(155deg, rgba(255,255,255,0.1), rgba(255,255,255,0.04)); border-radius: 24px;
             overflow: hidden; position: relative;
             min-width: 0; min-height: 0;
+            border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 18px 36px rgba(8, 6, 24, 0.24);
         }
         .video-wrapper video:not(#localCamPip) { width: 100%; height: 100%; object-fit: contain; display: block; background: #000; }
         #localCamPip {
@@ -97,8 +136,8 @@
             aspect-ratio: 16 / 9;
             height: auto;
             object-fit: cover;
-            border-radius: 10px;
-            border: 2px solid rgba(255, 255, 255, 0.35);
+            border-radius: 16px;
+            border: 3px solid rgba(255, 209, 102, 0.5);
             background: #000;
             z-index: 5;
             transform: scaleX(-1);
@@ -107,7 +146,7 @@
         }
         .video-label {
             position: absolute; bottom: 10px; left: 10px;
-            background: rgba(0,0,0,0.55); color: white;
+            background: rgba(14, 12, 36, 0.58); color: white;
             padding: 4px 10px; border-radius: 20px;
             font-size: 12px; font-weight: 500;
             backdrop-filter: blur(4px); pointer-events: none;
@@ -130,7 +169,7 @@
             place-items: center;
             font-size: 28px;
             font-weight: 700;
-            background: rgba(255,255,255,0.16);
+            background: linear-gradient(135deg, rgba(255,79,135,0.26), rgba(107,91,255,0.32));
             border: 1px solid rgba(255,255,255,0.28);
             backdrop-filter: blur(4px);
             color: #fff;
@@ -144,12 +183,156 @@
         /* ── Chat sidebar ── */
         .chat-section {
             width: 320px; flex-shrink: 0;
-            background: #1e1e1e; border-left: 1px solid #2a2a2a;
+            background: rgba(19, 17, 48, 0.76); border-left: 1px solid var(--fun-line);
+            backdrop-filter: blur(14px);
             display: none; flex-direction: column; overflow: hidden;
         }
         .chat-section.active { display: flex; }
+        .tools-section {
+            width: 340px;
+            flex-shrink: 0;
+            background: rgba(24, 18, 58, 0.8);
+            border-left: 1px solid var(--fun-line);
+            backdrop-filter: blur(14px);
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .tools-section.active { display: flex; }
+        .tools-header {
+            padding: 15px 18px;
+            border-bottom: 1px solid var(--fun-line);
+            color: white;
+            font-weight: 600;
+            font-size: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .tools-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .tool-card {
+            background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04));
+            border: 1px solid rgba(255,255,255,0.09);
+            border-radius: 18px;
+            padding: 12px;
+        }
+        .tool-title {
+            color: #fff;
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            letter-spacing: 0.2px;
+        }
+        .timer-display {
+            color: #fff;
+            font-size: 30px;
+            font-weight: 700;
+            text-align: center;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            margin-bottom: 10px;
+        }
+        .timer-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .timer-row button,
+        .tool-btn {
+            background: linear-gradient(135deg, var(--fun-pink), var(--fun-violet));
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 7px 9px;
+            cursor: pointer;
+        }
+        .timer-row button:hover,
+        .tool-btn:hover {
+            background: linear-gradient(135deg, #ff6899, #7f6dff);
+        }
+        .timer-row .tool-btn-ghost {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .timer-row .tool-btn-ghost:hover {
+            background: rgba(255,255,255,0.14);
+        }
+        .checklist-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .tool-input,
+        .tool-textarea {
+            width: 100%;
+            background: rgba(9, 8, 30, 0.4);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 14px;
+            padding: 8px 10px;
+            font-size: 12px;
+            outline: none;
+        }
+        .tool-input:focus,
+        .tool-textarea:focus {
+            border-color: var(--fun-cyan);
+        }
+        .tool-textarea {
+            min-height: 120px;
+            resize: vertical;
+            line-height: 1.4;
+        }
+        .tool-muted {
+            color: #c0b4f5;
+            font-size: 11px;
+            margin-top: 6px;
+        }
+        .checklist {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 180px;
+            overflow-y: auto;
+        }
+        .check-item {
+            display: grid;
+            grid-template-columns: 18px 1fr auto;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 14px;
+            padding: 7px 8px;
+            color: #ddd;
+            font-size: 12px;
+        }
+        .check-item.done .check-text {
+            text-decoration: line-through;
+            opacity: 0.6;
+        }
+        .check-remove {
+            background: transparent;
+            border: none;
+            color: #9a9a9a;
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 1;
+            padding: 2px 4px;
+        }
+        .check-remove:hover {
+            color: #fff;
+        }
         .chat-header {
-            padding: 15px 18px; border-bottom: 1px solid #2a2a2a;
+            padding: 15px 18px; border-bottom: 1px solid var(--fun-line);
             color: white; font-weight: 600; font-size: 15px; flex-shrink: 0;
             display: flex; justify-content: space-between; align-items: center;
         }
@@ -165,27 +348,27 @@
         .chat-messages::-webkit-scrollbar { width: 3px; }
         .chat-messages::-webkit-scrollbar-thumb { background: #3a3a3a; border-radius: 4px; }
         .chat-message {
-            padding: 9px 12px; border-radius: 8px;
-            background: #2a2a2a; color: #ddd; font-size: 13px; word-break: break-word;
+            padding: 9px 12px; border-radius: 14px;
+            background: rgba(255,255,255,0.08); color: #f5f0ff; font-size: 13px; word-break: break-word;
         }
-        .message-user { font-weight: 600; color: #667eea; margin-bottom: 3px; font-size: 12px; }
-        .message-time { font-size: 10px; color: #555; margin-top: 3px; }
+        .message-user { font-weight: 600; color: var(--fun-yellow); margin-bottom: 3px; font-size: 12px; }
+        .message-time { font-size: 10px; color: #afa4df; margin-top: 3px; }
         .chat-input {
-            padding: 10px 14px; border-top: 1px solid #2a2a2a;
+            padding: 10px 14px; border-top: 1px solid var(--fun-line);
             display: flex; gap: 8px; flex-shrink: 0;
             align-items: center;
         }
         .chat-input input {
-            flex: 1; padding: 8px 12px; border: 1px solid #3a3a3a;
-            border-radius: 20px; background: #2a2a2a; color: white; font-size: 13px; outline: none;
+            flex: 1; padding: 10px 14px; border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 999px; background: rgba(255,255,255,0.08); color: white; font-size: 13px; outline: none;
         }
-        .chat-input input:focus { border-color: #667eea; }
+        .chat-input input:focus { border-color: var(--fun-cyan); }
         .chat-input button {
-            background: #667eea; color: white; border-radius: 20px; padding: 8px 14px; font-size: 13px;
+            background: linear-gradient(135deg, var(--fun-pink), var(--fun-violet)); color: white; border-radius: 999px; padding: 8px 14px; font-size: 13px;
         }
-        .chat-input button:hover { background: #5568d3; }
+        .chat-input button:hover { background: linear-gradient(135deg, #ff6899, #7f6dff); }
         .attachment-btn {
-            background: #2a2a2a !important;
+            background: rgba(255,255,255,0.1) !important;
             color: white;
             min-width: 42px;
             padding: 8px 10px !important;
@@ -217,20 +400,21 @@
                 }
                 .video-wrapper:hover .host-controls { opacity: 1; }
                 .host-btn {
-                    background: rgba(0,0,0,0.65); border: none; color: white;
+                    background: rgba(13,10,35,0.6); border: 1px solid rgba(255,255,255,0.08); color: white;
                     width: 28px; height: 28px; border-radius: 50%;
                     cursor: pointer; font-size: 12px; display: flex;
                     align-items: center; justify-content: center;
                     padding: 0; transition: background 0.2s;
                 }
-                .host-btn:hover { background: rgba(198,40,40,0.85); }
-                .host-btn.banned { background: rgba(198,40,40,0.7); }
+                .host-btn:hover { background: linear-gradient(135deg, var(--fun-pink), #ff8b3d); }
+                .host-btn.banned { background: linear-gradient(135deg, var(--fun-danger), #ff8b3d); }
 
                 /* ── Call controls bar ── */
         .call-controls {
             flex-shrink: 0; height: 68px;
             display: flex; justify-content: center; align-items: center; gap: 14px;
-            background: #1e1e1e; border-top: 1px solid #2a2a2a;
+            background: rgba(22, 18, 52, 0.74); border-top: 1px solid var(--fun-line);
+            backdrop-filter: blur(14px);
         }
         .call-controls button {
             width: 48px; height: 48px; border-radius: 50%;
@@ -238,30 +422,37 @@
             font-size: 18px; transition: background 0.2s, transform 0.1s;
         }
         .call-controls button:active { transform: scale(0.92); }
-        .ctrl-on { background: #2a2a2a !important; color: white; }
-        .ctrl-off { background: #c62828 !important; color: white; }
+        .ctrl-on { background: linear-gradient(135deg, var(--fun-pink), var(--fun-violet)) !important; color: white; }
+        .ctrl-off { background: linear-gradient(135deg, var(--fun-danger), #ff8b3d) !important; color: white; }
 
         /* ── Lobby ── */
         .lobby-overlay {
-            position: fixed; inset: 0; background: #111; z-index: 200;
+            position: fixed; inset: 0; background: rgba(13, 10, 32, 0.82); z-index: 200;
             display: flex; align-items: center; justify-content: center;
         }
         .lobby-overlay.hidden { display: none; }
         .lobby-card {
-            background: #1e1e1e; border-radius: 20px; padding: 32px;
+            background: linear-gradient(180deg, rgba(31,24,71,0.94), rgba(41,26,92,0.9)); border-radius: 28px; padding: 32px;
             width: 500px; max-width: 95vw;
             display: flex; flex-direction: column; align-items: center; gap: 20px;
-            box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+            box-shadow: 0 30px 80px rgba(6, 6, 22, 0.46);
+            border: 1px solid rgba(255,255,255,0.1);
         }
         .lobby-card h2 { color: white; font-size: 22px; font-weight: 700; }
         .lobby-preview {
             width: 100%; aspect-ratio: 16/9;
-            background: #111; border-radius: 14px; overflow: hidden; position: relative;
+            background: #111; border-radius: 20px; overflow: hidden; position: relative;
+            border: 2px solid rgba(255,255,255,0.08);
         }
         .lobby-preview video { width: 100%; height: 100%; object-fit: contain; transform: scaleX(-1); background: #000; }
         .lobby-preview .cam-off-placeholder {
             position: absolute; inset: 0; display: flex;
             align-items: center; justify-content: center; color: #444; font-size: 48px;
+        }
+        .lobby-preview .cam-off-placeholder .icon-svg {
+            width: 54px;
+            height: 54px;
+            color: rgba(255,255,255,0.4);
         }
         .lobby-preview .cam-off-placeholder.hidden { display: none; }
         .lobby-controls { display: flex; gap: 16px; }
@@ -271,25 +462,26 @@
             font-size: 20px; transition: background 0.2s, transform 0.1s;
         }
         .lobby-controls button:active { transform: scale(0.92); }
-        .lobby-controls .ctrl-on { background: #2a2a2a; color: white; }
-        .lobby-controls .ctrl-off { background: #c62828; color: white; }
-        .lobby-info { color: #888; font-size: 14px; display: flex; align-items: center; gap: 8px; }
-        .lobby-info .dot { width: 8px; height: 8px; border-radius: 50%; background: #4caf50; flex-shrink: 0; }
+        .lobby-controls .ctrl-on { background: linear-gradient(135deg, var(--fun-pink), var(--fun-violet)); color: white; }
+        .lobby-controls .ctrl-off { background: linear-gradient(135deg, var(--fun-danger), #ff8b3d); color: white; }
+        .lobby-info { color: #d1c7ff; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+        .lobby-info .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--fun-cyan); flex-shrink: 0; }
         .btn-join-now {
-            background: #667eea; color: white; font-size: 16px;
+            background: linear-gradient(135deg, var(--fun-pink), #ff8b3d); color: white; font-size: 16px;
             padding: 14px 52px; border-radius: 30px; border: none;
             cursor: pointer; font-weight: 600; transition: background 0.2s, transform 0.1s;
         }
-        .btn-join-now:hover { background: #5568d3; }
+        .btn-join-now:hover { background: linear-gradient(135deg, #ff6899, #ff9e42); }
         .btn-join-now:active { transform: scale(0.97); }
         .btn-back {
-            background: none; border: 1px solid #3a3a3a; color: #888;
-            padding: 8px 22px; border-radius: 20px; cursor: pointer; font-size: 13px;
+            background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1); color: #e6dcff;
+            padding: 8px 22px; border-radius: 999px; cursor: pointer; font-size: 13px;
         }
-        .btn-back:hover { border-color: #666; color: #ccc; }
+        .btn-back:hover { border-color: rgba(255,255,255,0.18); color: #fff; }
 
         @media (max-width: 640px) {
             .chat-section { width: 100%; position: absolute; bottom: 68px; top: 56px; z-index: 5; }
+            .tools-section { width: 100%; position: absolute; bottom: 68px; top: 56px; z-index: 6; }
             .videos-container.p2 { grid-template-columns: 1fr; grid-template-rows: repeat(2, 1fr); }
             .videos-container.p3 .video-wrapper:last-child { grid-column: span 1; }
         }
@@ -302,11 +494,11 @@
             <h2>Ready to join?</h2>
             <div class="lobby-preview">
                 <video id="lobbyVideo" autoplay muted playsinline></video>
-                <div class="cam-off-placeholder hidden" id="camOffPlaceholder">📷</div>
+                <div class="cam-off-placeholder hidden" id="camOffPlaceholder"></div>
             </div>
             <div class="lobby-controls">
-                <button id="lobbyMicBtn" class="ctrl-on" onclick="toggleLobbyMic()" title="Toggle microphone">🎤</button>
-                <button id="lobbyCamBtn" class="ctrl-on" onclick="toggleLobbyCam()" title="Toggle camera">📷</button>
+                <button id="lobbyMicBtn" class="ctrl-on" onclick="toggleLobbyMic()" title="Toggle microphone"></button>
+                <button id="lobbyCamBtn" class="ctrl-on" onclick="toggleLobbyCam()" title="Toggle camera"></button>
             </div>
             <div class="lobby-info" id="lobbyInfo">
                 <span class="dot"></span>
@@ -324,7 +516,8 @@
             <button class="copy-btn" onclick="copyMeetingCode()">Copy</button>
         </div>
         <div class="header-right">
-            <button class="btn-toggle" onclick="toggleChat()">Chat</button>
+            <button id="chatToggleBtn" class="btn-toggle" onclick="toggleChat()">Chat</button>
+            <button id="toolsToggleBtn" class="btn-toggle" onclick="toggleTools()">Tools</button>
             <button class="btn-leave" onclick="leaveMeeting()">Leave</button>
         </div>
     </div>
@@ -344,25 +537,64 @@
             <div class="chat-header">
                 Chat
                 <span id="e2eeIndicator" style="font-size:10px;opacity:0.65;margin-left:6px;color:#4ade80"></span>
-                <button class="chat-close" onclick="toggleChat()" title="Close chat">✕</button>
+                <button id="closeChatBtn" class="chat-close" onclick="toggleChat()" title="Close chat"></button>
             </div>
             <div class="chat-messages" id="chatMessages"></div>
             <div class="chat-input">
                 <input type="file" id="chatFileInput" hidden onchange="handleAttachmentSelected(event)">
-                <button class="attachment-btn" onclick="openAttachmentPicker()" title="Attach file">📎</button>
+                <button id="attachmentBtn" class="attachment-btn" onclick="openAttachmentPicker()" title="Attach file"></button>
                 <input type="text" id="chatInput" placeholder="Type a message..." onkeypress="handleChatKeyPress(event)">
                 <button onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+
+        <div class="tools-section" id="toolsSection">
+            <div class="tools-header">
+                <span>Productivity Tools</span>
+                <button id="closeToolsBtn" class="chat-close" onclick="toggleTools()" title="Close tools"></button>
+            </div>
+            <div class="tools-content">
+                <div class="tool-card">
+                    <div class="tool-title">Focus Timer</div>
+                    <div class="timer-display" id="timerDisplay">25:00</div>
+                    <div class="timer-row">
+                        <button onclick="setTimerPreset(25)">25m Focus</button>
+                        <button onclick="setTimerPreset(5)">5m Break</button>
+                        <button onclick="setTimerPreset(15)">15m Plan</button>
+                    </div>
+                    <div class="timer-row">
+                        <button id="timerStartBtn" class="tool-btn" onclick="toggleFocusTimer()">Start</button>
+                        <button class="tool-btn tool-btn-ghost" onclick="resetFocusTimer()">Reset</button>
+                    </div>
+                    <div class="tool-muted" id="timerStatus">Ready to focus</div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-title">Quick Checklist</div>
+                    <div class="checklist-row">
+                        <input id="checkInput" class="tool-input" type="text" placeholder="Add task and press Enter" onkeypress="handleChecklistKey(event)">
+                        <button class="tool-btn" onclick="addChecklistItemFromInput()">Add</button>
+                    </div>
+                    <ul id="checklist" class="checklist"></ul>
+                    <div class="tool-muted" id="checkCount">0 tasks</div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-title">Meeting Notes</div>
+                    <textarea id="meetingNotes" class="tool-textarea" placeholder="Capture decisions, actions, and next steps..."></textarea>
+                    <div class="tool-muted" id="notesStatus">Auto-saved</div>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- In-call controls -->
     <div class="call-controls" id="callControls">
-        <button id="callMicBtn" class="ctrl-on" onclick="toggleCallMic()" title="Toggle microphone">🎤</button>
-        <button id="callCamBtn" class="ctrl-on" onclick="toggleCallCam()" title="Toggle camera">📷</button>
-        <button id="lockChatBtn" class="ctrl-on" onclick="toggleRoomChat()" title="Lock chat" style="display:none">🔒</button>
-        <button id="presentbtn" class="ctrl-on" onclick="togglePresent()" title="Toggle presentation">📽️</button>
-        <button id="leaveBtn" class="ctrl-on" onclick="leaveMeeting()" title="Leave meeting">🚪</button>
+        <button id="callMicBtn" class="ctrl-on" onclick="toggleCallMic()" title="Toggle microphone"></button>
+        <button id="callCamBtn" class="ctrl-on" onclick="toggleCallCam()" title="Toggle camera"></button>
+        <button id="lockChatBtn" class="ctrl-on" onclick="toggleRoomChat()" title="Lock chat" style="display:none"></button>
+        <button id="presentbtn" class="ctrl-on" onclick="togglePresent()" title="Toggle presentation"></button>
+        <button id="leaveBtn" class="ctrl-on" onclick="leaveMeeting()" title="Leave meeting"></button>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
@@ -402,6 +634,58 @@
         const videosContainer = document.getElementById('videosContainer');
         const chatMessages = document.getElementById('chatMessages');
         const chatFileInput = document.getElementById('chatFileInput');
+
+        function iconSvg(name, className = '') {
+            const cls = `icon-svg ${className}`.trim();
+            const icons = {
+                mic: `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a3 3 0 0 1 3 3v5a3 3 0 1 1-6 0V7a3 3 0 0 1 3-3Z"></path><path d="M19 11a7 7 0 0 1-14 0"></path><path d="M12 18v3"></path><path d="M8 21h8"></path></svg>`,
+                micOff: `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 9v3a3 3 0 0 0 5.12 2.12"></path><path d="M12 4a3 3 0 0 1 3 3v1"></path><path d="M19 11a7 7 0 0 1-11.2 5.6"></path><path d="M12 18v3"></path><path d="M8 21h8"></path><path d="M4 4l16 16"></path></svg>`,
+                camera: `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8a2 2 0 0 1 2-2h8l2 2h4a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"></path><circle cx="12" cy="13" r="3"></circle></svg>`,
+                cameraOff: `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.5 6H13l2 2h4a2 2 0 0 1 2 2v7"></path><path d="M3 8a2 2 0 0 1 2-2h2"></path><path d="M3 10v7a2 2 0 0 0 2 2h10"></path><path d="M4 4l16 16"></path></svg>`,
+                lock: `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 1 1 8 0v3"></path></svg>`,
+                unlock: `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M16 11V8a4 4 0 0 0-7.2-2.4"></path></svg>`,
+                present: `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="12" rx="2"></rect><path d="M8 21h8"></path><path d="M12 17v4"></path><path d="m10 10 5 2-5 2z"></path></svg>`,
+                stopPresent: `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="12" rx="2"></rect><rect x="10" y="9" width="4" height="4"></rect><path d="M8 21h8"></path><path d="M12 17v4"></path></svg>`,
+                leave: `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17l5-5-5-5"></path><path d="M15 12H3"></path><path d="M12 4h6a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6"></path></svg>`,
+                close: `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12"></path><path d="M18 6 6 18"></path></svg>`,
+                attachment: `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.44 11.05 12.25 20.24a6 6 0 1 1-8.49-8.49l9.2-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.82-2.82l8.48-8.49"></path></svg>`,
+                chat: `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10h10"></path><path d="M7 14h6"></path><path d="M21 12a8 8 0 0 1-8 8H5l-2 2V12a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8Z"></path></svg>`,
+                chatOff: `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8 8 0 0 1-8 8H5l-2 2V12a8 8 0 0 1 8-8h2"></path><path d="M4 4l16 16"></path></svg>`,
+                remove: `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"></path><path d="M6 6l12 12"></path></svg>`
+            };
+            return icons[name] || '';
+        }
+
+        function setIconButton(buttonOrId, iconName, title) {
+            const button = typeof buttonOrId === 'string' ? document.getElementById(buttonOrId) : buttonOrId;
+            if (!button) return;
+            button.innerHTML = iconSvg(iconName);
+            if (title) {
+                button.title = title;
+                button.setAttribute('aria-label', title);
+            }
+        }
+
+        function initStaticIcons() {
+            document.getElementById('camOffPlaceholder').innerHTML = iconSvg('cameraOff');
+            setIconButton('lobbyMicBtn', 'mic', 'Toggle microphone');
+            setIconButton('lobbyCamBtn', 'camera', 'Toggle camera');
+            setIconButton('closeChatBtn', 'close', 'Close chat');
+            setIconButton('attachmentBtn', 'attachment', 'Attach file');
+            setIconButton('closeToolsBtn', 'close', 'Close tools');
+            setIconButton('callMicBtn', 'mic', 'Toggle microphone');
+            setIconButton('callCamBtn', 'camera', 'Toggle camera');
+            setIconButton('lockChatBtn', 'lock', 'Lock chat');
+            setIconButton('presentbtn', 'present', 'Present screen');
+            setIconButton('leaveBtn', 'leave', 'Leave meeting');
+        }
+
+        // Productivity tools state
+        const toolsStorageKey = `sup-tools-${room}`;
+        let toolsState = { notes: '', checklist: [] };
+        let focusTotalSeconds = 25 * 60;
+        let focusRemainingSeconds = focusTotalSeconds;
+        let focusTimerId = null;
 
         // Fetch current user info
         async function getCurrentUser() {
@@ -521,7 +805,7 @@
                 );
                 return new TextDecoder().decode(pt);
             } catch {
-                return '🔒 [Encrypted — from a different session]';
+                return '[Encrypted - from a different session]';
             }
         }
 
@@ -559,7 +843,7 @@
         }
 
         function e2eeMarkReady() {
-            document.getElementById('e2eeIndicator').textContent = '🔒 End-to-end encrypted';
+            document.getElementById('e2eeIndicator').innerHTML = `${iconSvg('lock', 'icon-small')}<span>End-to-end encrypted</span>`;
             setChatAvailability();
             if (!e2eeChatLoaded) {
                 e2eeChatLoaded = true;
@@ -596,7 +880,7 @@
             setChatAvailability();
             const btn = document.getElementById('lockChatBtn');
             if (btn){
-                btn.textContent = roomChatLocked ? '🔓' : '🔒';
+                setIconButton(btn, roomChatLocked ? 'unlock' : 'lock', roomChatLocked ? 'Unlock chat for all' : 'Lock chat for all');
                 btn.title = roomChatLocked ? 'Unlock chat for all' : 'Lock chat for all';
                 btn.classList.toggle('ctrl-off',roomChatLocked)
                 btn.classList.toggle('ctrl-on',!roomChatLocked)
@@ -708,7 +992,7 @@
             localStream.getAudioTracks().forEach(t => t.enabled = micEnabled);
             const btn = document.getElementById('lobbyMicBtn');
             btn.className = micEnabled ? 'ctrl-on' : 'ctrl-off';
-            btn.textContent = micEnabled ? '🎤' : '🔇';
+            setIconButton(btn, micEnabled ? 'mic' : 'micOff', 'Toggle microphone');
         }
 
         function toggleLobbyCam() {
@@ -717,7 +1001,7 @@
             localStream.getVideoTracks().forEach(t => t.enabled = camEnabled);
             const btn = document.getElementById('lobbyCamBtn');
             btn.className = camEnabled ? 'ctrl-on' : 'ctrl-off';
-            btn.textContent = camEnabled ? '📷' : '🚫';
+            setIconButton(btn, camEnabled ? 'camera' : 'cameraOff', 'Toggle camera');
 
             document.getElementById('lobbyVideo').style.display = camEnabled ? '' : 'none';
             document.getElementById('camOffPlaceholder').classList.toggle('hidden', camEnabled);
@@ -786,9 +1070,9 @@
             const micBtn = document.getElementById('callMicBtn');
             const camBtn = document.getElementById('callCamBtn');
             micBtn.className = micEnabled ? 'ctrl-on' : 'ctrl-off';
-            micBtn.textContent = micEnabled ? '🎤' : '🔇';
+            setIconButton(micBtn, micEnabled ? 'mic' : 'micOff', 'Toggle microphone');
             camBtn.className = camEnabled ? 'ctrl-on' : 'ctrl-off';
-            camBtn.textContent = camEnabled ? '📷' : '🚫';
+            setIconButton(camBtn, camEnabled ? 'camera' : 'cameraOff', 'Toggle camera');
         }
 
         function toggleCallMic() {
@@ -819,7 +1103,7 @@
             if (!btn) return;
             btn.classList.toggle('ctrl-off', isPresenting);
             btn.classList.toggle('ctrl-on', !isPresenting);
-            btn.textContent = isPresenting ? '🛑' : '📽️';
+            setIconButton(btn, isPresenting ? 'stopPresent' : 'present', isPresenting ? 'Stop presenting' : 'Present screen');
             btn.title = isPresenting ? 'Stop presenting' : 'Present screen';
         }
 
@@ -1054,22 +1338,23 @@
                     const controls = document.createElement('div');
                     controls.className = 'host-controls';
 
-                    const mkBtn = (emoji, title, handler) => {
+                    const mkBtn = (iconName, title, handler) => {
                         const b = document.createElement('button');
                         b.className = 'host-btn';
                         b.title = title;
-                        b.textContent = emoji;
+                        b.setAttribute('aria-label', title);
+                        b.innerHTML = iconSvg(iconName);
                         b.onclick = handler;
                         return b;
                     };
 
-                    const chatBtn = mkBtn('💬', 'Disable chat', () => toggleParticipantChat(id));
+                    const chatBtn = mkBtn('chatOff', 'Disable chat', () => toggleParticipantChat(id));
                     chatBtn.id = `chat-ban-btn-${id}`;
 
-                    controls.appendChild(mkBtn('🔇', 'Mute microphone',     () => sendHostControl(id, 'mute-audio')));
-                    controls.appendChild(mkBtn('🚫', 'Turn off camera',     () => sendHostControl(id, 'mute-video')));
+                    controls.appendChild(mkBtn('micOff', 'Mute microphone',     () => sendHostControl(id, 'mute-audio')));
+                    controls.appendChild(mkBtn('cameraOff', 'Turn off camera',     () => sendHostControl(id, 'mute-video')));
                     controls.appendChild(chatBtn);
-                    controls.appendChild(mkBtn('✕',  'Remove from meeting', () => sendHostControl(id, 'remove')));
+                    controls.appendChild(mkBtn('remove',  'Remove from meeting', () => sendHostControl(id, 'remove')));
                     wrapper.appendChild(controls);
                 }
 
@@ -1211,7 +1496,7 @@
                 const encodedName = utf8ToBase64(entry.attachment.originalName || 'attachment');
                 body = `
                     <a class="message-attachment" href="#" data-stored-name-b64="${encodedStoredName}" data-url-b64="${encodedUrl}" data-name-b64="${encodedName}" onclick="downloadAttachmentFromLink(event)">
-                        <span>📎</span>
+                        <span>${iconSvg('attachment', 'icon-small')}</span>
                         <span>${escapeHtml(entry.attachment.originalName)}</span>
                     </a>
                     <div class="attachment-meta">${escapeHtml(entry.attachment.mimeType || 'file')} • ${formatAttachmentSize(entry.attachment.size)}</div>
@@ -1322,9 +1607,189 @@
 
         function toggleChat() {
             const chat = document.getElementById('chatSection');
-            const btn = document.querySelector('.btn-toggle');
+            const tools = document.getElementById('toolsSection');
+            const btn = document.getElementById('chatToggleBtn');
+            const toolsBtn = document.getElementById('toolsToggleBtn');
+            tools.classList.remove('active');
+            toolsBtn.classList.remove('active');
             chat.classList.toggle('active');
             btn.classList.toggle('active', chat.classList.contains('active'));
+        }
+
+        function toggleTools() {
+            const chat = document.getElementById('chatSection');
+            const tools = document.getElementById('toolsSection');
+            const chatBtn = document.getElementById('chatToggleBtn');
+            const toolsBtn = document.getElementById('toolsToggleBtn');
+            chat.classList.remove('active');
+            chatBtn.classList.remove('active');
+            tools.classList.toggle('active');
+            toolsBtn.classList.toggle('active', tools.classList.contains('active'));
+        }
+
+        function loadToolsState() {
+            try {
+                const raw = localStorage.getItem(toolsStorageKey);
+                if (!raw) return;
+                const parsed = JSON.parse(raw);
+                if (typeof parsed !== 'object' || !parsed) return;
+                if (typeof parsed.notes === 'string') toolsState.notes = parsed.notes;
+                if (Array.isArray(parsed.checklist)) toolsState.checklist = parsed.checklist;
+            } catch (err) {
+                console.error('Failed to load tools state:', err);
+            }
+        }
+
+        function saveToolsState() {
+            try {
+                localStorage.setItem(toolsStorageKey, JSON.stringify(toolsState));
+            } catch (err) {
+                console.error('Failed to save tools state:', err);
+            }
+        }
+
+        function formatTimer(totalSeconds) {
+            const mins = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+            const secs = String(totalSeconds % 60).padStart(2, '0');
+            return `${mins}:${secs}`;
+        }
+
+        function renderFocusTimer() {
+            const timerDisplay = document.getElementById('timerDisplay');
+            const timerStatus = document.getElementById('timerStatus');
+            const timerStartBtn = document.getElementById('timerStartBtn');
+            timerDisplay.textContent = formatTimer(focusRemainingSeconds);
+            if (focusTimerId) {
+                timerStatus.textContent = 'Running';
+                timerStartBtn.textContent = 'Pause';
+            } else if (focusRemainingSeconds === 0) {
+                timerStatus.textContent = 'Session complete';
+                timerStartBtn.textContent = 'Start';
+            } else {
+                timerStatus.textContent = 'Ready to focus';
+                timerStartBtn.textContent = 'Start';
+            }
+        }
+
+        function setTimerPreset(minutes) {
+            focusTotalSeconds = Math.max(1, parseInt(minutes, 10) || 25) * 60;
+            focusRemainingSeconds = focusTotalSeconds;
+            if (focusTimerId) {
+                clearInterval(focusTimerId);
+                focusTimerId = null;
+            }
+            renderFocusTimer();
+        }
+
+        function toggleFocusTimer() {
+            if (focusTimerId) {
+                clearInterval(focusTimerId);
+                focusTimerId = null;
+                renderFocusTimer();
+                return;
+            }
+
+            if (focusRemainingSeconds <= 0) {
+                focusRemainingSeconds = focusTotalSeconds;
+            }
+
+            focusTimerId = setInterval(() => {
+                focusRemainingSeconds = Math.max(0, focusRemainingSeconds - 1);
+                renderFocusTimer();
+                if (focusRemainingSeconds === 0) {
+                    clearInterval(focusTimerId);
+                    focusTimerId = null;
+                    renderFocusTimer();
+                    alert('Focus session complete');
+                }
+            }, 1000);
+
+            renderFocusTimer();
+        }
+
+        function resetFocusTimer() {
+            if (focusTimerId) {
+                clearInterval(focusTimerId);
+                focusTimerId = null;
+            }
+            focusRemainingSeconds = focusTotalSeconds;
+            renderFocusTimer();
+        }
+
+        function renderChecklist() {
+            const list = document.getElementById('checklist');
+            const count = document.getElementById('checkCount');
+            list.innerHTML = '';
+
+            toolsState.checklist.forEach(item => {
+                const li = document.createElement('li');
+                li.className = `check-item ${item.done ? 'done' : ''}`;
+                li.innerHTML = `
+                    <input type="checkbox" ${item.done ? 'checked' : ''} data-id="${escapeHtml(item.id)}" onchange="toggleChecklistItem(event)">
+                    <span class="check-text">${escapeHtml(item.text)}</span>
+                    <button class="check-remove" data-id="${escapeHtml(item.id)}" onclick="removeChecklistItem(event)" aria-label="Remove task">${iconSvg('remove', 'icon-small')}</button>
+                `;
+                list.appendChild(li);
+            });
+
+            const total = toolsState.checklist.length;
+            const done = toolsState.checklist.filter(i => i.done).length;
+            count.textContent = total === 0 ? '0 tasks' : `${done}/${total} done`;
+        }
+
+        function addChecklistItemFromInput() {
+            const input = document.getElementById('checkInput');
+            const text = (input.value || '').trim();
+            if (!text) return;
+            toolsState.checklist.push({
+                id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                text,
+                done: false
+            });
+            input.value = '';
+            saveToolsState();
+            renderChecklist();
+        }
+
+        function handleChecklistKey(event) {
+            if (event.key === 'Enter') addChecklistItemFromInput();
+        }
+
+        function toggleChecklistItem(event) {
+            const id = event.target.dataset.id;
+            const item = toolsState.checklist.find(i => i.id === id);
+            if (!item) return;
+            item.done = !!event.target.checked;
+            saveToolsState();
+            renderChecklist();
+        }
+
+        function removeChecklistItem(event) {
+            const id = event.target.dataset.id;
+            toolsState.checklist = toolsState.checklist.filter(i => i.id !== id);
+            saveToolsState();
+            renderChecklist();
+        }
+
+        function initProductivityTools() {
+            loadToolsState();
+            renderChecklist();
+            renderFocusTimer();
+
+            const notesEl = document.getElementById('meetingNotes');
+            const notesStatusEl = document.getElementById('notesStatus');
+            notesEl.value = toolsState.notes || '';
+
+            let saveTimer = null;
+            notesEl.addEventListener('input', () => {
+                toolsState.notes = notesEl.value;
+                if (saveTimer) clearTimeout(saveTimer);
+                notesStatusEl.textContent = 'Saving...';
+                saveTimer = setTimeout(() => {
+                    saveToolsState();
+                    notesStatusEl.textContent = 'Auto-saved';
+                }, 250);
+            });
         }
 
         function copyMeetingCode() {
@@ -1349,7 +1814,11 @@
             videosContainer.classList.add(`p${Math.min(count, 9)}`);
         }
 
-        window.addEventListener('load', initLobby);
+        window.addEventListener('load', () => {
+            initStaticIcons();
+            initProductivityTools();
+            initLobby();
+        });
     </script>
 </body>
 </html>
