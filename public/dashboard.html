@@ -6,17 +6,17 @@
     <title>Dashboard - Sup!</title>
     <style>
         :root {
-            --bg: #fff4d6;
-            --panel: rgba(255, 255, 255, 0.72);
-            --panel-solid: #fff8ff;
-            --line: rgba(113, 71, 182, 0.14);
-            --ink: #20123a;
-            --muted: #6a5d8c;
-            --brand: #ff4f87;
-            --brand-2: #6b5bff;
-            --accent: #ffd166;
-            --danger: #ff5d5d;
-            --shadow: 0 24px 70px rgba(126, 76, 196, 0.16);
+            --bg: #eef6ff;
+            --panel: rgba(255, 255, 255, 0.78);
+            --panel-solid: #f8fbff;
+            --line: rgba(15, 23, 42, 0.12);
+            --ink: #0f172a;
+            --muted: #475569;
+            --brand: #0ea5e9;
+            --brand-2: #2563eb;
+            --accent: #f59e0b;
+            --danger: #ef4444;
+            --shadow: 0 24px 64px rgba(15, 23, 42, 0.12);
         }
         * {
             margin: 0;
@@ -26,10 +26,10 @@
         body {
             font-family: 'Trebuchet MS', 'Avenir Next', 'Segoe UI', sans-serif;
             background:
-                radial-gradient(circle at 8% 14%, rgba(255, 79, 135, 0.22), transparent 24%),
-                radial-gradient(circle at 85% 10%, rgba(107, 91, 255, 0.2), transparent 22%),
-                radial-gradient(circle at 72% 78%, rgba(255, 209, 102, 0.2), transparent 20%),
-                linear-gradient(180deg, #fff7d8 0%, #ffe7f7 46%, #daf0ff 100%);
+                radial-gradient(circle at 8% 14%, rgba(14, 165, 233, 0.2), transparent 24%),
+                radial-gradient(circle at 85% 10%, rgba(37, 99, 235, 0.16), transparent 22%),
+                radial-gradient(circle at 72% 78%, rgba(245, 158, 11, 0.14), transparent 20%),
+                linear-gradient(180deg, #f8fbff 0%, #eef7ff 52%, #f4f8ff 100%);
             color: var(--ink);
             min-height: 100vh;
         }
@@ -37,7 +37,7 @@
             position: sticky;
             top: 0;
             z-index: 10;
-            background: rgba(255, 248, 255, 0.68);
+            background: rgba(255, 255, 255, 0.74);
             backdrop-filter: blur(14px);
             padding: 16px 34px;
             display: flex;
@@ -117,7 +117,7 @@
             color: white;
         }
         .btn-primary {
-            background: linear-gradient(135deg, var(--brand), #ff8b3d);
+            background: var(--brand);
             color: white;
         }
         .container {
@@ -152,8 +152,8 @@
         .hero-card {
             background:
                 linear-gradient(145deg, rgba(255,255,255,0.78), rgba(255,255,255,0.58)),
-                radial-gradient(circle at top right, rgba(255, 79, 135, 0.14), transparent 30%),
-                radial-gradient(circle at bottom left, rgba(107, 91, 255, 0.12), transparent 26%);
+                radial-gradient(circle at top right, rgba(14, 165, 233, 0.14), transparent 30%),
+                radial-gradient(circle at bottom left, rgba(37, 99, 235, 0.12), transparent 26%);
         }
         .hero-card p {
             color: var(--muted);
@@ -260,13 +260,13 @@
         .meeting-code {
             color: #51483d;
             font-size: 12px;
-            background: rgba(107, 91, 255, 0.08);
+            background: rgba(37, 99, 235, 0.08);
             padding: 10px 12px;
             border-radius: 16px;
             margin-bottom: 12px;
             font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
             word-break: break-all;
-            border: 1px solid rgba(107, 91, 255, 0.1);
+            border: 1px solid rgba(37, 99, 235, 0.1);
         }
         .meeting-host {
             color: var(--muted);
@@ -290,7 +290,7 @@
             border: 1px solid var(--line);
         }
         .btn-connected {
-            background: linear-gradient(135deg, #2ec4b6, #6b5bff);
+            background: #14b8a6;
             color: white;
         }
         .modal {
@@ -309,7 +309,7 @@
             justify-content: center;
         }
         .modal-content {
-            background: linear-gradient(180deg, #fff9ff, #fff8f0);
+            background: linear-gradient(180deg, #ffffff, #f7fbff);
             padding: 30px;
             border-radius: 22px;
             max-width: 400px;
@@ -342,7 +342,7 @@
         }
         .form-group input:focus {
             outline: none;
-            border-color: rgba(255, 79, 135, 0.35);
+            border-color: rgba(14, 165, 233, 0.35);
         }
         .modal-buttons {
             display: flex;

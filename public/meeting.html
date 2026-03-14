@@ -9,11 +9,11 @@
             --fun-line: rgba(255, 255, 255, 0.12);
             --fun-text: #fff7ff;
             --fun-muted: #c6b9ff;
-            --fun-pink: #ff4f87;
-            --fun-violet: #6b5bff;
-            --fun-cyan: #2ee6d6;
-            --fun-yellow: #ffd166;
-            --fun-danger: #ff5d5d;
+            --fun-pink: #0ea5e9;
+            --fun-violet: #2563eb;
+            --fun-cyan: #2dd4bf;
+            --fun-yellow: #f59e0b;
+            --fun-danger: #ef4444;
         }
         * {
             margin: 0;
@@ -25,10 +25,10 @@
         body {
             font-family: 'Trebuchet MS', 'Avenir Next', 'Segoe UI', sans-serif;
             background:
-                radial-gradient(circle at 10% 10%, rgba(255, 79, 135, 0.28), transparent 24%),
-                radial-gradient(circle at 85% 10%, rgba(46, 230, 214, 0.22), transparent 20%),
-                radial-gradient(circle at 72% 82%, rgba(255, 209, 102, 0.18), transparent 18%),
-                linear-gradient(145deg, #120f2d 0%, #221657 42%, #112443 100%);
+                radial-gradient(circle at 10% 10%, rgba(14, 165, 233, 0.22), transparent 24%),
+                radial-gradient(circle at 85% 10%, rgba(45, 212, 191, 0.16), transparent 20%),
+                radial-gradient(circle at 72% 82%, rgba(245, 158, 11, 0.14), transparent 18%),
+                linear-gradient(145deg, #08172c 0%, #0d2345 42%, #102d57 100%);
             display: flex;
             flex-direction: column;
         }
@@ -37,7 +37,7 @@
         .header {
             flex-shrink: 0;
             height: 56px;
-            background: rgba(22, 18, 52, 0.74);
+            background: rgba(8, 23, 44, 0.78);
             backdrop-filter: blur(14px);
             padding: 0 20px;
             display: flex;
@@ -85,11 +85,11 @@
             padding: 8px 14px; border: none; border-radius: 6px;
             cursor: pointer; font-weight: 600; transition: background 0.2s;
         }
-        .btn-leave { background: linear-gradient(135deg, var(--fun-danger), #ff8b3d); color: white; border-radius: 999px; padding: 8px 20px; }
-        .btn-leave:hover { background: linear-gradient(135deg, #ff4776, #ff7c31); }
+        .btn-leave { background: var(--fun-danger); color: white; border-radius: 999px; padding: 8px 20px; }
+        .btn-leave:hover { background: #dc2626; }
         .btn-toggle { background: rgba(255,255,255,0.1); color: white; font-size: 13px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.08); }
         .btn-toggle:hover { background: rgba(255,255,255,0.16); }
-        .btn-toggle.active { background: linear-gradient(135deg, var(--fun-pink), var(--fun-violet)); }
+        .btn-toggle.active { background: var(--fun-pink); }
 
         /* ── Main layout ── */
         .main-content { flex: 1; display: flex; overflow: hidden; min-height: 0; }
@@ -183,7 +183,7 @@
         /* ── Chat sidebar ── */
         .chat-section {
             width: 320px; flex-shrink: 0;
-            background: rgba(19, 17, 48, 0.76); border-left: 1px solid var(--fun-line);
+            background: rgba(8, 23, 44, 0.78); border-left: 1px solid var(--fun-line);
             backdrop-filter: blur(14px);
             display: none; flex-direction: column; overflow: hidden;
         }
@@ -191,7 +191,7 @@
         .tools-section {
             width: 340px;
             flex-shrink: 0;
-            background: rgba(24, 18, 58, 0.8);
+            background: rgba(9, 27, 50, 0.82);
             border-left: 1px solid var(--fun-line);
             backdrop-filter: blur(14px);
             display: none;
@@ -245,7 +245,7 @@
         }
         .timer-row button,
         .tool-btn {
-            background: linear-gradient(135deg, var(--fun-pink), var(--fun-violet));
+            background: var(--fun-pink);
             color: #fff;
             border: none;
             border-radius: 8px;
@@ -256,7 +256,7 @@
         }
         .timer-row button:hover,
         .tool-btn:hover {
-            background: linear-gradient(135deg, #ff6899, #7f6dff);
+            background: var(--fun-violet);
         }
         .timer-row .tool-btn-ghost {
             background: rgba(255,255,255,0.08);
@@ -364,9 +364,9 @@
         }
         .chat-input input:focus { border-color: var(--fun-cyan); }
         .chat-input button {
-            background: linear-gradient(135deg, var(--fun-pink), var(--fun-violet)); color: white; border-radius: 999px; padding: 8px 14px; font-size: 13px;
+            background: var(--fun-pink); color: white; border-radius: 999px; padding: 8px 14px; font-size: 13px;
         }
-        .chat-input button:hover { background: linear-gradient(135deg, #ff6899, #7f6dff); }
+        .chat-input button:hover { background: var(--fun-violet); }
         .attachment-btn {
             background: rgba(255,255,255,0.1) !important;
             color: white;
@@ -406,14 +406,14 @@
                     align-items: center; justify-content: center;
                     padding: 0; transition: background 0.2s;
                 }
-                .host-btn:hover { background: linear-gradient(135deg, var(--fun-pink), #ff8b3d); }
-                .host-btn.banned { background: linear-gradient(135deg, var(--fun-danger), #ff8b3d); }
+                .host-btn:hover { background: var(--fun-pink); }
+                .host-btn.banned { background: var(--fun-danger); }
 
                 /* ── Call controls bar ── */
         .call-controls {
             flex-shrink: 0; height: 68px;
             display: flex; justify-content: center; align-items: center; gap: 14px;
-            background: rgba(22, 18, 52, 0.74); border-top: 1px solid var(--fun-line);
+            background: rgba(8, 23, 44, 0.78); border-top: 1px solid var(--fun-line);
             backdrop-filter: blur(14px);
         }
         .call-controls button {
@@ -422,8 +422,8 @@
             font-size: 18px; transition: background 0.2s, transform 0.1s;
         }
         .call-controls button:active { transform: scale(0.92); }
-        .ctrl-on { background: linear-gradient(135deg, var(--fun-pink), var(--fun-violet)) !important; color: white; }
-        .ctrl-off { background: linear-gradient(135deg, var(--fun-danger), #ff8b3d) !important; color: white; }
+        .ctrl-on { background: var(--fun-pink) !important; color: white; }
+        .ctrl-off { background: var(--fun-danger) !important; color: white; }
 
         /* ── Lobby ── */
         .lobby-overlay {
@@ -432,7 +432,7 @@
         }
         .lobby-overlay.hidden { display: none; }
         .lobby-card {
-            background: linear-gradient(180deg, rgba(31,24,71,0.94), rgba(41,26,92,0.9)); border-radius: 28px; padding: 32px;
+            background: linear-gradient(180deg, rgba(8,23,44,0.94), rgba(12,37,66,0.9)); border-radius: 28px; padding: 32px;
             width: 500px; max-width: 95vw;
             display: flex; flex-direction: column; align-items: center; gap: 20px;
             box-shadow: 0 30px 80px rgba(6, 6, 22, 0.46);
@@ -462,16 +462,16 @@
             font-size: 20px; transition: background 0.2s, transform 0.1s;
         }
         .lobby-controls button:active { transform: scale(0.92); }
-        .lobby-controls .ctrl-on { background: linear-gradient(135deg, var(--fun-pink), var(--fun-violet)); color: white; }
-        .lobby-controls .ctrl-off { background: linear-gradient(135deg, var(--fun-danger), #ff8b3d); color: white; }
+        .lobby-controls .ctrl-on { background: var(--fun-pink); color: white; }
+        .lobby-controls .ctrl-off { background: var(--fun-danger); color: white; }
         .lobby-info { color: #d1c7ff; font-size: 14px; display: flex; align-items: center; gap: 8px; }
         .lobby-info .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--fun-cyan); flex-shrink: 0; }
         .btn-join-now {
-            background: linear-gradient(135deg, var(--fun-pink), #ff8b3d); color: white; font-size: 16px;
+            background: var(--fun-pink); color: white; font-size: 16px;
             padding: 14px 52px; border-radius: 30px; border: none;
             cursor: pointer; font-weight: 600; transition: background 0.2s, transform 0.1s;
         }
-        .btn-join-now:hover { background: linear-gradient(135deg, #ff6899, #ff9e42); }
+        .btn-join-now:hover { background: var(--fun-violet); }
         .btn-join-now:active { transform: scale(0.97); }
         .btn-back {
             background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1); color: #e6dcff;
