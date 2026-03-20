@@ -14,8 +14,11 @@ import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { Strategy as GitHubStrategy } from 'passport-github2';
 import 'dotenv/config';
 import { db } from './db.js';
-import { users, meetings, meetingParticipants, messages } from './schema.js';
+import { users, meetings, meetingParticipants, messages, userTwoFactor, meetingReactions, raisedHands, meetingWaitingRoom } from './schema.js';
 import { eq, or, and, inArray, sql } from 'drizzle-orm';
+import speakeasy from 'speakeasy';
+import ratelimit from 'express-rate-limit';
+import { timestamp } from 'drizzle-orm/mysql-core';
 
 const app = express();
 const server = http.createServer(app);
@@ -44,6 +47,21 @@ const roomCleanupTimers = new Map();
 const roomChatBanned = new Map();
 const roomChatLocked = new Map();
 const instantRoomHosts = new Map();
+const apiLimiter = ratelimit({
+    windowMs: 15* 60 * 1000,
+    max: 100,
+    message: "Too many requests, please try again later.",
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+const authLimiter = ratelimit({
+    windowMs: 15* 60 * 1000,
+    max: 10,
+    skipSuccessfulRequests: true
+});
+
+app.use('/api/', apiLimiter);
+
 function getRoomAttachmentDir(roomCode) {
     return path.join(TEMP_ATTACHMENTS_DIR, roomCode);
 }
@@ -352,7 +370,7 @@ const verifyToken = (req, res, next) => {
 };
 
 // ============ AUTH ROUTES ============
-app.post('/api/register', async (req, res) => {
+app.post('/api/register', authLimiter, async (req, res) => {
     try {
         const { email, password, name } = req.body;
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -370,9 +388,9 @@ app.post('/api/register', async (req, res) => {
     }
 });
 
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', authLimiter, async (req, res) => {
     try {
-        const { email, password } = req.body;
+        const { email, password, twoFactorToken } = req.body;
         const result = await db.select().from(users).where(eq(users.email, email));
         
         if (result.length === 0) {
@@ -385,6 +403,21 @@ app.post('/api/login', async (req, res) => {
         if (!validPassword) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
+
+        const twoFa = await db.select().from(userTwoFactor).where(eq(userTwoFactor.userId, user.id));
+
+        if(twoFa[0]?.enabled && !twoFactorToken){
+            return res.json({ requiredTwoFactor: true, temptoken: jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '5m' }) });
+        }
+
+        if (twoFa[0]?.enabled) {
+            const verified= speakeasy.totp.verify({
+                secret: twoFa[0].secret,
+                token: twoFactorToken,
+                window: 2
+            });
+            if (!verified) return res.status(401).json({ error: 'Invalid 2FA token' });
+        }
         
         const token = jwt.sign({ id: user.id }, JWT_SECRET);
         res.json({ token, user: { id: user.id, email: user.email, name: user.name } });
@@ -393,6 +426,32 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
+app.post('/api/user/theme', verifyToken, async (req, res) => {
+    try {
+        const { theme } = req.body;
+
+        await db.insert(userPreferences).values({
+            userId: req.userId,
+            theme
+        }).onConflictDoUpdate({
+            target: userPreferences.userId,
+            set: { theme, updatedAt: new Date() }
+        });
+
+        res.json({ theme });
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+});
+
+app.get('/api/user/theme', verifyToken, async (req, res) => {
+    try {
+        const result = await db.select().from(userPreferences).where(eq(userPreferences.userId, req.userId));
+        res.json({ theme: result[0]?.theme || 'light' });
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+});
 // ============ USER PROFILE ROUTES ============
 app.get('/api/user/profile', verifyToken, async (req, res) => {
     try {
@@ -736,6 +795,169 @@ app.get('/api/meetings/:code/host-check', verifyToken, async (req, res) => {
     }
 });
 
+app.post('/api/2fa/setup', verifyToken, async (req, res) => {
+    try{
+        const secret = speakeasy.generateSecret({ 
+            name: `Sup! (${req.user?.email})`,
+            length: 32
+        });
+
+        const qrCode = await QRCode.toDataURL(secret.otpauth_url);
+
+        await db.insert(userTwoFactor).values({
+            userId: req.userId,
+            secret: secret.base32,
+            backupCodes: JSON.stringify(generateBackupCodes(10)),
+            enabled: false
+        }).onConflictDoUpdate({
+            target: userTwoFactor.userId,
+            set: { secret: secret.base32}
+    });
+
+    res.json({
+        qrCode,
+        secret: secret.base32,
+        backupCodes: JSON.parse(generateBackupCodes(10))
+    });
+}catch(err){
+    res.status(400).json({ error: err.message });
+}
+});
+
+app.post('/api/2fa/verify', verifyToken, async (req, res) => {
+    try{
+        const { token } = req.body;
+        const twoFa = await db.select().from(userTwoFactor).where(eq(userTwoFactor.userId, req.userId));
+
+        const verified = speakeasy.totp.verify({
+            secret: twoFa[0].secret,
+            token,
+            window: 2
+        });
+
+        if (!verified) return res.status(401).json({ error: 'Invalid 2FA token' });
+
+        await db.update(userTwoFactor).set({ enabled: true }).where(eq(userTwoFactor.userId, req.userId));
+        res.json({ success: true });
+    }catch(err){
+        res.status(400).json({ error: err.message });
+    }
+});
+
+app.post('/api/2fa/disable', verifyToken, async (req, res) => {
+    try{
+        await db.update(userTwoFactor).set({ enabled: false, secret: null, backupCodes: null }).where(eq(userTwoFactor.userId, req.userId));
+        res.json({ success: true });
+    }catch(err){
+        res.status(400).json({ error: err.message });
+    }
+});
+
+function generateBackupCodes(count=10) {
+    const codes = [];
+    for(let i=0; i<count; i++){
+        codes.push(randomUUID().split('-')[0]);
+    }
+    return JSON.stringify(codes);
+}
+
+app.post('/api/meetings/:code/waiting-room/request', verifyToken, async (req, res) => {
+    try{
+        const { code } = req.params;
+
+        await db.insert(waitingRoom).values({
+            meetingCode: code,
+            userId: req.userId,
+            status: 'awaiting'
+        });
+
+        const meeting = await db.select({ hostId: meetings.hostId }).from(meetings).where(eq(meetings.meetingCode, code));
+        io.to(code).emit('userWaiting', { userId: req.userId});
+        res.json({ status: 'waiting' });
+    }catch(err){
+        res.status(400).json({ error: err.message });
+    }
+});
+
+app.post('/api/meetings/:code/waiting-room/approve', verifyToken, async (req, res) => {
+    try{
+        const { code } = req.params;
+        const { userId } = req.body;
+
+        const isHost = await isHostForRoom(req.userId, code);
+        if (!isHost) return res.status(403).json({ error: 'Not Host' });
+
+        await db.update(meetingWaitingRoom)
+            .set({ status: 'approved' })
+            .where(
+                and(
+                    eq(meetingWaitingRoom.meetingCode, code),
+                    eq(meetingWaitingRoom.userId, userId)
+                )
+            );
+        io.to(code).emit('userApproved', { userId });
+        res.json({ success: true });
+    }catch(err){
+        res.status(400).json({ error: err.message });
+    }
+});
+
+app.post('/api/meetings/:code/poll', verifyToken, async (req, res) => {
+    try {
+        const { code } = req.params;
+        const { question, options } = req.body;
+
+        const isHost = await isHostForRoom(req.userId, code);
+        if (!isHost) return res.status(403).json({ error: 'Not host' });
+
+        const result = await db.insert(polls).values({
+            meetingCode: code,
+            hostId: req.userId,
+            question,
+            options: JSON.stringify(options)
+        }).returning();
+
+        io.to(code).emit('newPoll', {
+            pollId: result[0].id,
+            question,
+            options
+        });
+
+        res.json(result[0]);
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+});
+
+app.post('/api/polls/:pollId/vote', verifyToken, async (req, res) => {
+    try {
+        const { optionIndex } = req.body;
+
+        const result = await db.insert(pollResponses).values({
+            pollId: req.params.pollId,
+            userId: req.userId,
+            selectedOptionIndex: optionIndex
+        }).returning();
+
+        // Get updated results
+        const responses = await db.select().from(pollResponses).where(eq(pollResponses.pollId, req.params.pollId));
+        const aggregated = aggregatePollResults(responses);
+
+        io.emit('pollUpdate', { pollId: req.params.pollId, results: aggregated });
+        res.json(result[0]);
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+});
+
+function aggregatePollResults(responses) {
+    const counts = {};
+    responses.forEach(r => {
+        counts[r.selectedOptionIndex] = (counts[r.selectedOptionIndex] || 0) + 1;
+    });
+    return counts;
+}
+
 app.get('/api/rooms/:code/participants', verifyToken, (req, res) => {
     const roomCode = req.params.code;
     const room = io.sockets.adapter.rooms.get(roomCode);
@@ -761,6 +983,38 @@ app.get('/join/:code', (req, res) => {
 const connectedUsers = {};
 
 io.on('connection', (socket) => {
+    socket.on('reaction', (data) => {
+        const { meetingCode,emoji,userId } = data;
+
+        io.to(meetingCode).emit('reaction', {
+            userId,
+            emoji,
+            timestamp: new Date()
+        });
+
+        db.insert(meetingReactions).values({
+            meetingCode,
+            userId,
+            emoji
+        });
+    });
+
+    socket.on('raiseHand', (data) => {
+        const { meetingCode, userId } = data;
+        io.to(meetingCode).emit('raiseHand', {userId});
+
+        db.insert(raisedHands).values({
+            meetingCode,
+            userId,
+            raisedAt: new Date()
+        });
+    });
+
+    socket.on('lowerHand', (data) => {
+        const { meetingCode, userId } = data;
+        io.to(meetingCode).emit('lowerHand', {userId});
+    });
+
     socket.on('join-room', async (room, userId, userName, ack) => {
         const roomBefore = io.sockets.adapter.rooms.get(room);
         const isFirstJoiner = !roomBefore || roomBefore.size === 0;

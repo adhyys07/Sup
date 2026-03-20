@@ -256,4 +256,4 @@ For issues and questions, create an issue in the repository.
 
 ---
 
-**Built with ❤️ using Node.js, Express, PostgreSQL, and WebRTC**
+**Built with ❤️**

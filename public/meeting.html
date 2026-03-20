@@ -15,6 +15,16 @@
             --fun-yellow: #f59e0b;
             --fun-danger: #ef4444;
         }
+        body.light-mode {
+            --fun-line: rgba(15, 23, 42, 0.14);
+            --fun-text: #0f172a;
+            --fun-muted: #334155;
+            --fun-pink: #0ea5e9;
+            --fun-violet: #2563eb;
+            --fun-cyan: #0d9488;
+            --fun-yellow: #d97706;
+            --fun-danger: #dc2626;
+        }
         * {
             margin: 0;
             padding: 0;
@@ -32,6 +42,13 @@
             display: flex;
             flex-direction: column;
         }
+        body.light-mode {
+            background:
+                radial-gradient(circle at 10% 10%, rgba(14, 165, 233, 0.18), transparent 24%),
+                radial-gradient(circle at 85% 10%, rgba(37, 99, 235, 0.14), transparent 20%),
+                radial-gradient(circle at 72% 82%, rgba(245, 158, 11, 0.1), transparent 18%),
+                linear-gradient(145deg, #f7fbff 0%, #eef6ff 45%, #e8f0ff 100%);
+        }
 
         /* ── Header ── */
         .header {
@@ -45,6 +62,12 @@
             align-items: center;
             border-bottom: 1px solid var(--fun-line);
             z-index: 10;
+        }
+        body.light-mode .header,
+        body.light-mode .call-controls,
+        body.light-mode .chat-section,
+        body.light-mode .tools-section {
+            background: rgba(255, 255, 255, 0.82);
         }
         .header-left { display: flex; align-items: center; gap: 12px; }
         h1 { color: var(--fun-text); font-size: 18px; font-weight: 700; }
@@ -125,6 +148,11 @@
             min-width: 0; min-height: 0;
             border: 1px solid rgba(255,255,255,0.1);
             box-shadow: 0 18px 36px rgba(8, 6, 24, 0.24);
+        }
+        body.light-mode .video-wrapper {
+            background: linear-gradient(155deg, rgba(255,255,255,0.95), rgba(255,255,255,0.84));
+            border: 1px solid rgba(15,23,42,0.1);
+            box-shadow: 0 16px 28px rgba(15, 23, 42, 0.14);
         }
         .video-wrapper video:not(#localCamPip) { width: 100%; height: 100%; object-fit: contain; display: block; background: #000; }
         #localCamPip {
@@ -294,6 +322,116 @@
             color: #c0b4f5;
             font-size: 11px;
             margin-top: 6px;
+        }
+        body.light-mode .tool-title,
+        body.light-mode .timer-display,
+        body.light-mode .chat-message,
+        body.light-mode .message-user,
+        body.light-mode .message-attachment,
+        body.light-mode .chat-header,
+        body.light-mode .tools-header,
+        body.light-mode .tool-input,
+        body.light-mode .tool-textarea,
+        body.light-mode .chat-input input,
+        body.light-mode h1,
+        body.light-mode .meeting-code,
+        body.light-mode .copy-btn,
+        body.light-mode .btn-toggle {
+            color: var(--fun-text);
+        }
+        body.light-mode .tool-muted,
+        body.light-mode .message-time,
+        body.light-mode .attachment-meta {
+            color: var(--fun-muted);
+        }
+        .reaction-tray {
+            position: fixed;
+            right: 12px;
+            top: 68px;
+            z-index: 25;
+            display: flex;
+            gap: 6px;
+            padding: 8px;
+            border-radius: 14px;
+            background: rgba(8, 23, 44, 0.72);
+            border: 1px solid var(--fun-line);
+            backdrop-filter: blur(10px);
+        }
+        .reaction-tray button {
+            background: rgba(255,255,255,0.15);
+            border-radius: 10px;
+            padding: 8px 9px;
+            min-width: 34px;
+        }
+        .reaction-burst {
+            position: fixed;
+            bottom: 92px;
+            right: 20px;
+            font-size: 34px;
+            z-index: 30;
+            animation: float-up 1.9s ease forwards;
+            pointer-events: none;
+        }
+        @keyframes float-up {
+            0% { transform: translateY(0) scale(0.7); opacity: 0; }
+            15% { opacity: 1; }
+            100% { transform: translateY(-150px) scale(1.15); opacity: 0; }
+        }
+        .whiteboard-wrap {
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.12);
+            background: rgba(10, 12, 30, 0.5);
+        }
+        #whiteboardCanvas {
+            width: 100%;
+            height: 180px;
+            display: block;
+            touch-action: none;
+            background: #ffffff;
+            cursor: crosshair;
+        }
+        .poll-options {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .poll-option {
+            width: 100%;
+            text-align: left;
+        }
+        .transcript-box {
+            max-height: 140px;
+            overflow: auto;
+            padding: 8px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(9, 8, 30, 0.45);
+            color: #fff;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+        body.light-mode .transcript-box {
+            background: rgba(255,255,255,0.74);
+            color: #0f172a;
+            border-color: rgba(15,23,42,0.12);
+        }
+        .waiting-state {
+            background: rgba(255,255,255,0.06);
+            color: #e6dcff;
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 14px;
+            padding: 10px 12px;
+            width: 100%;
+            text-align: center;
+            font-size: 13px;
+            display: none;
+        }
+        .raised-hand-chip {
+            margin-left: 6px;
+            font-size: 12px;
+            color: var(--fun-yellow);
         }
         .checklist {
             list-style: none;
@@ -484,6 +622,13 @@
             .tools-section { width: 100%; position: absolute; bottom: 68px; top: 56px; z-index: 6; }
             .videos-container.p2 { grid-template-columns: 1fr; grid-template-rows: repeat(2, 1fr); }
             .videos-container.p3 .video-wrapper:last-child { grid-column: span 1; }
+            .reaction-tray {
+                top: auto;
+                bottom: 78px;
+                left: 12px;
+                right: 12px;
+                justify-content: center;
+            }
         }
     </style>
 </head>
@@ -505,6 +650,8 @@
                 <span id="lobbyParticipantText">Checking room...</span>
             </div>
             <button class="btn-join-now" onclick="joinCall()">Join now</button>
+            <button class="btn-back" id="requestJoinBtn" onclick="requestJoinApproval()">Request host approval</button>
+            <div class="waiting-state" id="waitingRoomState">Waiting for host to approve...</div>
             <button class="btn-back" onclick="window.location.href='/dashboard.html'">Back to dashboard</button>
         </div>
     </div>
@@ -516,10 +663,19 @@
             <button class="copy-btn" onclick="copyMeetingCode()">Copy</button>
         </div>
         <div class="header-right">
+            <button id="themeToggleBtn" class="btn-toggle" onclick="toggleTheme()">Theme</button>
             <button id="chatToggleBtn" class="btn-toggle" onclick="toggleChat()">Chat</button>
             <button id="toolsToggleBtn" class="btn-toggle" onclick="toggleTools()">Tools</button>
             <button class="btn-leave" onclick="leaveMeeting()">Leave</button>
         </div>
+    </div>
+
+    <div class="reaction-tray" id="reactionTray">
+        <button onclick="sendReaction('👍')">👍</button>
+        <button onclick="sendReaction('😂')">😂</button>
+        <button onclick="sendReaction('🎉')">🎉</button>
+        <button onclick="sendReaction('❤️')">❤️</button>
+        <button onclick="sendReaction('🚀')">🚀</button>
     </div>
 
     <div class="main-content">
@@ -584,6 +740,66 @@
                     <textarea id="meetingNotes" class="tool-textarea" placeholder="Capture decisions, actions, and next steps..."></textarea>
                     <div class="tool-muted" id="notesStatus">Auto-saved</div>
                 </div>
+
+                <div class="tool-card">
+                    <div class="tool-title">Live Polling</div>
+                    <div class="checklist-row">
+                        <input id="pollQuestion" class="tool-input" type="text" placeholder="Poll question">
+                    </div>
+                    <div class="checklist-row">
+                        <input id="pollOptions" class="tool-input" type="text" placeholder="Options (comma separated)">
+                    </div>
+                    <div class="timer-row">
+                        <button class="tool-btn" onclick="createPoll()">Create Poll</button>
+                    </div>
+                    <div class="tool-muted" id="pollStatus">No active poll</div>
+                    <div id="pollLivePanel" class="poll-options"></div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-title">Transcription</div>
+                    <div class="timer-row">
+                        <button class="tool-btn" id="transcriptionBtn" onclick="toggleTranscription()">Start</button>
+                        <button class="tool-btn tool-btn-ghost" onclick="clearTranscription()">Clear</button>
+                    </div>
+                    <div class="tool-muted" id="transcriptionStatus">Ready</div>
+                    <div id="transcriptBox" class="transcript-box"></div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-title">Virtual Background</div>
+                    <div class="timer-row">
+                        <button class="tool-btn" onclick="setVirtualBackground('none')">Off</button>
+                        <button class="tool-btn" onclick="setVirtualBackground('soft-blur')">Soft Blur</button>
+                        <button class="tool-btn" onclick="setVirtualBackground('mono')">Mono</button>
+                    </div>
+                    <div class="timer-row">
+                        <button class="tool-btn" onclick="setVirtualBackground('warm')">Warm</button>
+                        <button class="tool-btn" onclick="setVirtualBackground('cool')">Cool</button>
+                    </div>
+                    <div class="tool-muted" id="virtualBgStatus">No effect</div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-title">Whiteboard</div>
+                    <div class="whiteboard-wrap">
+                        <canvas id="whiteboardCanvas" width="800" height="360"></canvas>
+                    </div>
+                    <div class="timer-row" style="margin-top:8px;">
+                        <button class="tool-btn" onclick="clearWhiteboard(true)">Clear</button>
+                    </div>
+                    <div class="tool-muted" id="whiteboardStatus">Collaborative canvas ready</div>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-title">Breakout Rooms</div>
+                    <div class="checklist-row">
+                        <input id="breakoutName" class="tool-input" type="text" placeholder="Room name (e.g., Design)">
+                        <button class="tool-btn" onclick="createBreakoutRoom()">Create</button>
+                    </div>
+                    <ul id="breakoutList" class="checklist"></ul>
+                    <div class="tool-muted" id="breakoutStatus">No breakout rooms</div>
+                </div>
             </div>
         </div>
     </div>
@@ -592,8 +808,10 @@
     <div class="call-controls" id="callControls">
         <button id="callMicBtn" class="ctrl-on" onclick="toggleCallMic()" title="Toggle microphone"></button>
         <button id="callCamBtn" class="ctrl-on" onclick="toggleCallCam()" title="Toggle camera"></button>
+        <button id="raiseHandBtn" class="ctrl-on" onclick="toggleRaiseHand()" title="Raise hand">✋</button>
         <button id="lockChatBtn" class="ctrl-on" onclick="toggleRoomChat()" title="Lock chat" style="display:none"></button>
         <button id="presentbtn" class="ctrl-on" onclick="togglePresent()" title="Toggle presentation"></button>
+        <button id="recordBtn" class="ctrl-on" onclick="toggleRecording()" title="Record meeting">⏺</button>
         <button id="leaveBtn" class="ctrl-on" onclick="leaveMeeting()" title="Leave meeting"></button>
     </div>
 
@@ -623,6 +841,16 @@
         let chatBanned = false;
         let roomChatLocked = false;
         const participantChatBanned = {};
+        const raisedHands = new Set();
+        let isHandRaised = false;
+        let isWaitingForApproval = false;
+        let mediaRecorder = null;
+        let recordingChunks = [];
+        let transcriptionEngine = null;
+        let transcriptionRunning = false;
+        let activePoll = null;
+        let breakoutRooms = [];
+        let whiteboardStrokeId = 0;
 
         // E2EE state
         let e2eeRoomKey = null;
@@ -634,6 +862,8 @@
         const videosContainer = document.getElementById('videosContainer');
         const chatMessages = document.getElementById('chatMessages');
         const chatFileInput = document.getElementById('chatFileInput');
+        const whiteboardCanvas = document.getElementById('whiteboardCanvas');
+        const whiteboardCtx = whiteboardCanvas ? whiteboardCanvas.getContext('2d') : null;
 
         function iconSvg(name, className = '') {
             const cls = `icon-svg ${className}`.trim();
@@ -678,6 +908,39 @@
             setIconButton('lockChatBtn', 'lock', 'Lock chat');
             setIconButton('presentbtn', 'present', 'Present screen');
             setIconButton('leaveBtn', 'leave', 'Leave meeting');
+            updateThemeLabel();
+        }
+
+        function updateThemeLabel() {
+            const btn = document.getElementById('themeToggleBtn');
+            if (!btn) return;
+            btn.textContent = document.body.classList.contains('light-mode') ? 'Midnight' : 'Daylight';
+        }
+
+        function applyStoredTheme() {
+            const saved = localStorage.getItem('sup-meeting-theme');
+            if (saved === 'light') {
+                document.body.classList.add('light-mode');
+            } else {
+                document.body.classList.remove('light-mode');
+            }
+            updateThemeLabel();
+        }
+
+        function toggleTheme() {
+            const nextIsLight = !document.body.classList.contains('light-mode');
+            document.body.classList.toggle('light-mode', nextIsLight);
+            localStorage.setItem('sup-meeting-theme', nextIsLight ? 'light' : 'dark');
+            updateThemeLabel();
+
+            fetch('/api/user/theme', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ theme: nextIsLight ? 'light' : 'dark' })
+            }).catch(() => {});
         }
 
         // Productivity tools state
@@ -1009,6 +1272,7 @@
 
         // ============ JOIN CALL ============
         async function joinCall() {
+            if (isWaitingForApproval) return;
             // Hide lobby, show meeting
             document.getElementById('lobbyOverlay').classList.add('hidden');
 
@@ -1060,8 +1324,35 @@
                 // Set initial grid layout (just local video = p1)
                 updateGrid();
                 // Chat messages are loaded once E2EE key is established (see e2eeMarkReady)
+                initWhiteboard();
             } catch (error) {
                 console.error('Error joining call:', error);
+            }
+        }
+
+        async function requestJoinApproval() {
+            const statusEl = document.getElementById('waitingRoomState');
+            const requestBtn = document.getElementById('requestJoinBtn');
+            statusEl.style.display = 'block';
+            statusEl.textContent = 'Contacting waiting room...';
+
+            try {
+                const response = await fetch(`/api/meetings/${encodeURIComponent(room)}/waiting-room/request`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!response.ok) {
+                    statusEl.textContent = 'Waiting room is not enabled. You can join directly.';
+                    return;
+                }
+
+                isWaitingForApproval = true;
+                requestBtn.disabled = true;
+                statusEl.textContent = 'Request sent. Waiting for host approval...';
+                socket.emit('waiting-room-requested', { room, userId: currentUser?.id, name: currentUser?.name });
+            } catch {
+                statusEl.textContent = 'Unable to request approval right now.';
             }
         }
 
@@ -1073,6 +1364,49 @@
             setIconButton(micBtn, micEnabled ? 'mic' : 'micOff', 'Toggle microphone');
             camBtn.className = camEnabled ? 'ctrl-on' : 'ctrl-off';
             setIconButton(camBtn, camEnabled ? 'camera' : 'cameraOff', 'Toggle camera');
+            document.getElementById('raiseHandBtn').className = isHandRaised ? 'ctrl-off' : 'ctrl-on';
+        }
+
+        function toggleRaiseHand() {
+            isHandRaised = !isHandRaised;
+            const payload = { room, userId: currentUser?.id, userName: currentUser?.name };
+            socket.emit(isHandRaised ? 'raise-hand' : 'lower-hand', payload);
+            syncCallControls();
+            showHostNotification(isHandRaised ? 'You raised your hand' : 'You lowered your hand');
+        }
+
+        function sendReaction(emoji) {
+            socket.emit('reaction', {
+                room,
+                emoji,
+                userId: currentUser?.id,
+                userName: currentUser?.name
+            });
+            showReactionBurst(emoji);
+        }
+
+        function showReactionBurst(emoji) {
+            const el = document.createElement('div');
+            el.className = 'reaction-burst';
+            el.textContent = emoji;
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 2000);
+        }
+
+        function renderHandIndicator(userId, raised) {
+            const tile = document.getElementById(`tile-${userId}`) || (userId === 'local' ? document.getElementById('tile-local') : null);
+            if (!tile) return;
+            const label = tile.querySelector('.video-label');
+            if (!label) return;
+
+            let chip = label.querySelector('.raised-hand-chip');
+            if (raised && !chip) {
+                chip = document.createElement('span');
+                chip.className = 'raised-hand-chip';
+                chip.textContent = '✋';
+                label.appendChild(chip);
+            }
+            if (!raised && chip) chip.remove();
         }
 
         function toggleCallMic() {
@@ -1229,6 +1563,59 @@
         socket.on("receive-message", async (data) => {
             const decrypted = await decryptIncomingMessage(data);
             addMessageToChat(decrypted);
+        });
+
+        socket.on('reaction', ({ emoji }) => {
+            if (emoji) showReactionBurst(emoji);
+        });
+
+        socket.on('raise-hand', ({ userId, userName }) => {
+            if (!userId) return;
+            raisedHands.add(userId);
+            renderHandIndicator(userId, true);
+            showHostNotification(`${userName || 'Participant'} raised hand`);
+        });
+
+        socket.on('lower-hand', ({ userId, userName }) => {
+            if (!userId) return;
+            raisedHands.delete(userId);
+            renderHandIndicator(userId, false);
+            showHostNotification(`${userName || 'Participant'} lowered hand`);
+        });
+
+        socket.on('userApproved', ({ userId }) => {
+            if (!isWaitingForApproval) return;
+            if (currentUser?.id && userId && userId !== currentUser.id) return;
+            isWaitingForApproval = false;
+            const statusEl = document.getElementById('waitingRoomState');
+            statusEl.style.display = 'block';
+            statusEl.textContent = 'Approved by host. Joining...';
+            joinCall();
+        });
+
+        socket.on('whiteboard-draw', (payload) => {
+            drawRemoteStroke(payload);
+        });
+
+        socket.on('whiteboard-clear', () => {
+            clearWhiteboard(false);
+        });
+
+        socket.on('newPoll', ({ pollId, question, options }) => {
+            activePoll = { pollId, question, options: options || [] };
+            renderLivePoll();
+        });
+
+        socket.on('pollUpdate', ({ pollId, results }) => {
+            if (!activePoll || activePoll.pollId !== pollId) return;
+            activePoll.results = results || {};
+            renderLivePoll();
+        });
+
+        socket.on('breakout-created', ({ roomId, roomName }) => {
+            if (!roomId) return;
+            breakoutRooms.push({ roomId, roomName: roomName || roomId });
+            renderBreakoutRooms();
         });
 
         socket.on('camera-state', ({ from, isOff }) => {
@@ -1792,6 +2179,339 @@
             });
         }
 
+        async function createPoll() {
+            const question = (document.getElementById('pollQuestion').value || '').trim();
+            const optionsRaw = (document.getElementById('pollOptions').value || '').trim();
+            const status = document.getElementById('pollStatus');
+
+            if (!question || !optionsRaw) {
+                status.textContent = 'Add question and options first';
+                return;
+            }
+
+            const options = optionsRaw.split(',').map(v => v.trim()).filter(Boolean);
+            if (options.length < 2) {
+                status.textContent = 'Add at least 2 options';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/meetings/${encodeURIComponent(room)}/poll`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ question, options })
+                });
+
+                if (!response.ok) {
+                    const payload = await response.json().catch(() => null);
+                    throw new Error(payload?.error || 'Could not create poll');
+                }
+
+                const poll = await response.json();
+                activePoll = { pollId: poll.id || poll.pollId, question, options, results: {} };
+                status.textContent = 'Poll created';
+                renderLivePoll();
+            } catch (err) {
+                status.textContent = err.message;
+            }
+        }
+
+        function renderLivePoll() {
+            const panel = document.getElementById('pollLivePanel');
+            const status = document.getElementById('pollStatus');
+            if (!activePoll) {
+                panel.innerHTML = '';
+                status.textContent = 'No active poll';
+                return;
+            }
+
+            const totalVotes = Object.values(activePoll.results || {}).reduce((acc, v) => acc + Number(v || 0), 0);
+            status.textContent = `${activePoll.question} (${totalVotes} vote${totalVotes === 1 ? '' : 's'})`;
+
+            panel.innerHTML = (activePoll.options || []).map((option, index) => {
+                const votes = Number((activePoll.results || {})[index] || 0);
+                return `<button class="tool-btn poll-option" onclick="votePoll('${escapeHtml(activePoll.pollId || '')}', ${index})">${escapeHtml(option)} · ${votes}</button>`;
+            }).join('');
+        }
+
+        async function votePoll(pollId, optionIndex) {
+            if (!pollId) return;
+            try {
+                const response = await fetch(`/api/polls/${encodeURIComponent(pollId)}/vote`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ optionIndex })
+                });
+                if (!response.ok) {
+                    const payload = await response.json().catch(() => null);
+                    throw new Error(payload?.error || 'Vote failed');
+                }
+            } catch (err) {
+                document.getElementById('pollStatus').textContent = err.message;
+            }
+        }
+
+        function initTranscriptionEngine() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) return null;
+
+            const recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = 'en-US';
+
+            recognition.onresult = (event) => {
+                let interim = '';
+                const box = document.getElementById('transcriptBox');
+
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const text = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        const line = document.createElement('div');
+                        line.textContent = `${currentUser?.name || 'You'}: ${text}`;
+                        box.appendChild(line);
+                        socket.emit('transcription-segment', {
+                            room,
+                            segment: { speaker: currentUser?.name || 'You', text, at: new Date().toISOString() }
+                        });
+                    } else {
+                        interim = text;
+                    }
+                }
+
+                document.getElementById('transcriptionStatus').textContent = interim ? `Listening: ${interim}` : 'Listening';
+                box.scrollTop = box.scrollHeight;
+            };
+
+            recognition.onerror = () => {
+                transcriptionRunning = false;
+                document.getElementById('transcriptionBtn').textContent = 'Start';
+                document.getElementById('transcriptionStatus').textContent = 'Error, retry';
+            };
+
+            return recognition;
+        }
+
+        function toggleTranscription() {
+            if (!transcriptionEngine) {
+                transcriptionEngine = initTranscriptionEngine();
+                if (!transcriptionEngine) {
+                    document.getElementById('transcriptionStatus').textContent = 'Speech API not supported in this browser';
+                    return;
+                }
+            }
+
+            if (transcriptionRunning) {
+                transcriptionEngine.stop();
+                transcriptionRunning = false;
+                document.getElementById('transcriptionBtn').textContent = 'Start';
+                document.getElementById('transcriptionStatus').textContent = 'Stopped';
+                return;
+            }
+
+            transcriptionEngine.start();
+            transcriptionRunning = true;
+            document.getElementById('transcriptionBtn').textContent = 'Stop';
+            document.getElementById('transcriptionStatus').textContent = 'Listening';
+        }
+
+        function clearTranscription() {
+            document.getElementById('transcriptBox').innerHTML = '';
+            document.getElementById('transcriptionStatus').textContent = transcriptionRunning ? 'Listening' : 'Ready';
+        }
+
+        function setVirtualBackground(mode) {
+            const status = document.getElementById('virtualBgStatus');
+            const video = localVideo;
+            if (!video) return;
+
+            video.style.filter = '';
+            if (mode === 'soft-blur') {
+                video.style.filter = 'blur(1.8px) saturate(1.1)';
+                status.textContent = 'Soft blur enabled';
+            } else if (mode === 'mono') {
+                video.style.filter = 'grayscale(0.9) contrast(1.08)';
+                status.textContent = 'Mono style enabled';
+            } else if (mode === 'warm') {
+                video.style.filter = 'sepia(0.22) saturate(1.2)';
+                status.textContent = 'Warm style enabled';
+            } else if (mode === 'cool') {
+                video.style.filter = 'hue-rotate(12deg) saturate(1.2)';
+                status.textContent = 'Cool style enabled';
+            } else {
+                status.textContent = 'No effect';
+            }
+        }
+
+        function toggleRecording() {
+            const btn = document.getElementById('recordBtn');
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                btn.className = 'ctrl-on';
+                btn.textContent = '⏺';
+                showHostNotification('Recording stopped');
+                return;
+            }
+
+            if (!localStream) {
+                showHostNotification('No media stream available');
+                return;
+            }
+
+            try {
+                mediaRecorder = new MediaRecorder(localStream, { mimeType: 'video/webm;codecs=vp8,opus' });
+                recordingChunks = [];
+
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data && event.data.size > 0) recordingChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(recordingChunks, { type: 'video/webm' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `meeting-${room}-${Date.now()}.webm`;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    URL.revokeObjectURL(url);
+                };
+
+                mediaRecorder.start(1000);
+                btn.className = 'ctrl-off';
+                btn.textContent = '■';
+                showHostNotification('Recording started');
+            } catch {
+                showHostNotification('Recording is not supported in this browser');
+            }
+        }
+
+        function initWhiteboard() {
+            if (!whiteboardCtx || !whiteboardCanvas) return;
+
+            whiteboardCtx.lineCap = 'round';
+            whiteboardCtx.lineJoin = 'round';
+            whiteboardCtx.strokeStyle = '#111827';
+            whiteboardCtx.lineWidth = 2;
+
+            let drawing = false;
+            let currentStroke = '';
+
+            const positionFromEvent = (event) => {
+                const rect = whiteboardCanvas.getBoundingClientRect();
+                const touch = event.touches?.[0];
+                const x = ((touch ? touch.clientX : event.clientX) - rect.left) * (whiteboardCanvas.width / rect.width);
+                const y = ((touch ? touch.clientY : event.clientY) - rect.top) * (whiteboardCanvas.height / rect.height);
+                return { x, y };
+            };
+
+            const start = (event) => {
+                drawing = true;
+                currentStroke = `${Date.now()}-${++whiteboardStrokeId}`;
+                const { x, y } = positionFromEvent(event);
+                whiteboardCtx.beginPath();
+                whiteboardCtx.moveTo(x, y);
+                socket.emit('whiteboard-draw', { room, strokeId: currentStroke, type: 'start', x, y });
+                event.preventDefault();
+            };
+
+            const move = (event) => {
+                if (!drawing) return;
+                const { x, y } = positionFromEvent(event);
+                whiteboardCtx.lineTo(x, y);
+                whiteboardCtx.stroke();
+                socket.emit('whiteboard-draw', { room, strokeId: currentStroke, type: 'draw', x, y });
+                event.preventDefault();
+            };
+
+            const end = () => {
+                if (!drawing) return;
+                drawing = false;
+                socket.emit('whiteboard-draw', { room, strokeId: currentStroke, type: 'end' });
+            };
+
+            whiteboardCanvas.addEventListener('mousedown', start);
+            whiteboardCanvas.addEventListener('mousemove', move);
+            window.addEventListener('mouseup', end);
+            whiteboardCanvas.addEventListener('touchstart', start, { passive: false });
+            whiteboardCanvas.addEventListener('touchmove', move, { passive: false });
+            window.addEventListener('touchend', end);
+        }
+
+        const remoteStrokes = new Map();
+        function drawRemoteStroke(payload) {
+            if (!whiteboardCtx || !payload) return;
+            const key = payload.strokeId || 'default';
+            if (payload.type === 'start') {
+                remoteStrokes.set(key, { x: payload.x, y: payload.y });
+                return;
+            }
+            if (payload.type === 'draw') {
+                const prev = remoteStrokes.get(key);
+                if (!prev) return;
+                whiteboardCtx.beginPath();
+                whiteboardCtx.moveTo(prev.x, prev.y);
+                whiteboardCtx.lineTo(payload.x, payload.y);
+                whiteboardCtx.stroke();
+                remoteStrokes.set(key, { x: payload.x, y: payload.y });
+                return;
+            }
+            if (payload.type === 'end') {
+                remoteStrokes.delete(key);
+            }
+        }
+
+        function clearWhiteboard(emit) {
+            if (!whiteboardCtx || !whiteboardCanvas) return;
+            whiteboardCtx.clearRect(0, 0, whiteboardCanvas.width, whiteboardCanvas.height);
+            if (emit) socket.emit('whiteboard-clear', { room });
+        }
+
+        function createBreakoutRoom() {
+            const name = (document.getElementById('breakoutName').value || '').trim();
+            if (!name) {
+                document.getElementById('breakoutStatus').textContent = 'Enter a room name';
+                return;
+            }
+
+            const roomId = `${room}-br-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+            breakoutRooms.push({ roomId, roomName: name });
+            document.getElementById('breakoutName').value = '';
+            socket.emit('breakout-created', { room, roomId, roomName: name });
+            renderBreakoutRooms();
+        }
+
+        function renderBreakoutRooms() {
+            const list = document.getElementById('breakoutList');
+            const status = document.getElementById('breakoutStatus');
+            list.innerHTML = '';
+
+            if (breakoutRooms.length === 0) {
+                status.textContent = 'No breakout rooms';
+                return;
+            }
+
+            status.textContent = `${breakoutRooms.length} room${breakoutRooms.length === 1 ? '' : 's'} available`;
+            breakoutRooms.forEach((item) => {
+                const li = document.createElement('li');
+                li.className = 'check-item';
+                li.innerHTML = `<span></span><span class="check-text">${escapeHtml(item.roomName)} (${escapeHtml(item.roomId)})</span><button class="tool-btn" onclick="joinBreakoutRoom('${escapeHtml(item.roomId)}')">Join</button>`;
+                list.appendChild(li);
+            });
+        }
+
+        function joinBreakoutRoom(roomId) {
+            if (!roomId) return;
+            window.location.href = `/meeting.html?room=${encodeURIComponent(roomId)}`;
+        }
+
         function copyMeetingCode() {
             navigator.clipboard.writeText(room).then(() => {
                 alert('Meeting code copied!');
@@ -1815,6 +2535,7 @@
         }
 
         window.addEventListener('load', () => {
+            applyStoredTheme();
             initStaticIcons();
             initProductivityTools();
             initLobby();
