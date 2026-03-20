@@ -773,7 +773,17 @@
                 alert('Please enter a meeting code');
                 return;
             }
+
+            if (isBreakoutRoomCode(code)) {
+                alert('Breakout rooms can only be joined from inside an active meeting.');
+                return;
+            }
+
             joinMeetingByCode(code);
+        }
+
+        function isBreakoutRoomCode(code) {
+            return /-BR-/i.test(code || '');
         }
 
         function instantMeeting() {
@@ -782,6 +792,11 @@
         }
 
         async function joinMeetingByCode(code) {
+            if (isBreakoutRoomCode(code)) {
+                alert('Breakout rooms cannot be joined with a code.');
+                return;
+            }
+
             window.location.href = `/meeting.html?room=${code}`;
         }
 

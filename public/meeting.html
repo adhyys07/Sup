@@ -819,10 +819,23 @@
     <script>
         const params = new URLSearchParams(window.location.search);
         const room = params.get('room') || 'unknown-room';
+        const breakoutJoinToken = params.get('fromBreakout');
+
+        function isBreakoutRoomCode(code) {
+            return /-BR-/i.test(code || '');
+        }
+
+        const isBreakoutRoom = isBreakoutRoomCode(room);
+        const breakoutJoinAllowed = breakoutJoinToken === '1';
         
         const token = localStorage.getItem('token');
         if (!token) {
             window.location.href = '/';
+        }
+
+        if (isBreakoutRoom && !breakoutJoinAllowed) {
+            alert('Breakout rooms cannot be joined using a code. Join from the in-meeting breakout panel.');
+            window.location.href = '/dashboard.html';
         }
 
         document.getElementById('meetingCode').textContent = room;
@@ -1258,10 +1271,65 @@
             setIconButton(btn, micEnabled ? 'mic' : 'micOff', 'Toggle microphone');
         }
 
-        function toggleLobbyCam() {
+        function getLocalVideoTrack() {
+            return localStream?.getVideoTracks?.()[0] || null;
+        }
+
+        function stopLocalCameraTrack() {
+            if (!localStream) return;
+
+            localStream.getVideoTracks().forEach(track => {
+                track.stop();
+                localStream.removeTrack(track);
+            });
+
+            if (!isPresenting) {
+                replaceVideoTrack(null);
+            }
+        }
+
+        async function startLocalCameraTrack() {
+            if (getLocalVideoTrack()) return getLocalVideoTrack();
+
+            const camStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            const track = camStream.getVideoTracks()[0];
+            if (!track) return null;
+
+            if (!localStream) {
+                localStream = new MediaStream();
+            }
+
+            localStream.addTrack(track);
+
+            if (!isPresenting) {
+                localVideo.srcObject = localStream;
+                replaceVideoTrack(track);
+            }
+
+            const lobbyVideo = document.getElementById('lobbyVideo');
+            if (lobbyVideo) {
+                lobbyVideo.srcObject = localStream;
+            }
+
+            return track;
+        }
+
+        async function toggleLobbyCam() {
             if (!localStream) return;
             camEnabled = !camEnabled;
-            localStream.getVideoTracks().forEach(t => t.enabled = camEnabled);
+
+            if (camEnabled) {
+                try {
+                    await startLocalCameraTrack();
+                } catch (err) {
+                    camEnabled = false;
+                    console.error('Unable to start camera:', err);
+                    showHostNotification('Unable to access camera');
+                }
+            } else {
+                stopLocalCameraTrack();
+            }
+
             const btn = document.getElementById('lobbyCamBtn');
             btn.className = camEnabled ? 'ctrl-on' : 'ctrl-off';
             setIconButton(btn, camEnabled ? 'camera' : 'cameraOff', 'Toggle camera');
@@ -1416,10 +1484,22 @@
             syncCallControls();
         }
 
-        function toggleCallCam() {
+        async function toggleCallCam() {
             if (!localStream) return;
             camEnabled = !camEnabled;
-            localStream.getVideoTracks().forEach(t => t.enabled = camEnabled);
+
+            if (camEnabled) {
+                try {
+                    await startLocalCameraTrack();
+                } catch (err) {
+                    camEnabled = false;
+                    console.error('Unable to start camera:', err);
+                    showHostNotification('Unable to access camera');
+                }
+            } else {
+                stopLocalCameraTrack();
+            }
+
             const showCameraOff = isPresenting ? false : !camEnabled;
             setTileCameraState('tile-local', (currentUser?.name || 'You') + ' (You)', showCameraOff);
             if (currentUser && !isPresenting) {
@@ -1443,7 +1523,12 @@
 
         function replaceVideoTrack(newTrack) {
             Object.values(peerConnections).forEach(pc => {
-                const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+                let sender = pc.getSenders().find(s => s.track?.kind === 'video');
+
+                if (!sender && newTrack && localStream) {
+                    sender = pc.addTrack(newTrack, localStream);
+                }
+
                 if (sender) sender.replaceTrack(newTrack);
             });
         }
@@ -1490,6 +1575,7 @@
             }
             const camTrack = localStream?.getVideoTracks()?.[0];
             if (camTrack) replaceVideoTrack(camTrack);
+            else replaceVideoTrack(null);
             localVideo.srcObject = localStream;
             setTileCameraState('tile-local', (currentUser?.name || 'You') + ' (You)', !camEnabled);
             isPresenting = false;
@@ -2509,7 +2595,7 @@
 
         function joinBreakoutRoom(roomId) {
             if (!roomId) return;
-            window.location.href = `/meeting.html?room=${encodeURIComponent(roomId)}`;
+            window.location.href = `/meeting.html?room=${encodeURIComponent(roomId)}&fromBreakout=1`;
         }
 
         function copyMeetingCode() {

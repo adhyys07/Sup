@@ -977,6 +977,10 @@ app.get('/api/rooms/:code/participants', verifyToken, (req, res) => {
 });
 
 app.get('/join/:code', (req, res) => {
+    if (/-BR-/i.test(req.params.code || '')) {
+        return res.status(403).send('Breakout rooms cannot be joined with a code.');
+    }
+
     res.redirect(`/meeting.html?room=${encodeURIComponent(req.params.code)}`);
 });
 
