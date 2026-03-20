@@ -564,12 +564,12 @@
                                 return ''
                                         + '<div class="meeting-card">'
                                         + '<div class="meeting-title">' + escapeHtml(title) + '</div>'
-                                        + '<div class="meeting-code">' + escapeHtml(code) + '</div>'
+                                    + '<div class="meeting-code">' + escapeHtml(getMeetingShareLink(code)) + '</div>'
                                         + '<div class="meeting-host">Host: ' + escapeHtml(host) + '</div>'
                                         + scheduled
                                         + '<div class="card-buttons">'
                                         + '<button class="btn-primary" onclick="joinMeetingByCode(\'' + code + '\')">Join</button>'
-                                        + '<button class="btn-secondary" onclick="copyToClipboard(\'' + code + '\')">Copy Code</button>'
+                                    + '<button class="btn-secondary" onclick="copyMeetingLink(\'' + code + '\')">Copy Link</button>'
                                         + '</div>'
                                         + '<div class="card-buttons" style="margin-top:8px;">'
                                         + '<button class="btn-secondary" onclick="addToGoogleCalendar(\'' + code + '\')">Google Calendar</button>'
@@ -692,6 +692,41 @@
             });
         }
 
+        function getMeetingShareLink(code) {
+            return window.location.origin + '/join/' + encodeURIComponent(code || '');
+        }
+
+        function extractMeetingCodeFromInput(value) {
+            const raw = String(value || '').trim();
+            if (!raw) return '';
+
+            // Direct meeting code path
+            if (!raw.includes('http://') && !raw.includes('https://') && !raw.includes('/')) {
+                return raw.toUpperCase();
+            }
+
+            try {
+                const url = new URL(raw);
+                const roomParam = url.searchParams.get('room');
+                if (roomParam) return roomParam.trim().toUpperCase();
+
+                const joinMatch = url.pathname.match(/\/join\/([^/]+)/i);
+                if (joinMatch && joinMatch[1]) return decodeURIComponent(joinMatch[1]).trim().toUpperCase();
+            } catch {
+                // Fallback to simple path parsing for partial links.
+                const roomParamMatch = raw.match(/[?&]room=([^&]+)/i);
+                if (roomParamMatch && roomParamMatch[1]) {
+                    return decodeURIComponent(roomParamMatch[1]).trim().toUpperCase();
+                }
+                const joinMatch = raw.match(/\/join\/([^/?#]+)/i);
+                if (joinMatch && joinMatch[1]) {
+                    return decodeURIComponent(joinMatch[1]).trim().toUpperCase();
+                }
+            }
+
+            return raw.toUpperCase();
+        }
+
         function toGoogleDateUTC(dateObj) {
             return dateObj.toISOString().replace(/[-:]/g, '').replace('.000', '');
         }
@@ -704,7 +739,7 @@
             const end = new Date(start.getTime() + 30 * 60 * 1000);
 
             const title = meeting.title || 'Sup Meeting';
-            const joinUrl = window.location.origin + '/meeting.html?room=' + meeting.meetingCode;
+            const joinUrl = getMeetingShareLink(meeting.meetingCode);
             const details = 'Join meeting: ' + joinUrl;
 
             const url =
@@ -737,7 +772,7 @@
             const now = new Date();
 
             const title = meeting.title || 'Sup Meeting';
-            const joinUrl = window.location.origin + '/meeting.html?room=' + meeting.meetingCode;
+            const joinUrl = getMeetingShareLink(meeting.meetingCode);
             const uid = 'sup-' + meeting.meetingCode + '-' + now.getTime() + '@sup.local';
 
             const lines = [
@@ -768,9 +803,9 @@
         }
 
         async function joinMeeting() {
-            const code = document.getElementById('joinMeetingCode').value.trim().toUpperCase();
+            const code = extractMeetingCodeFromInput(document.getElementById('joinMeetingCode').value);
             if (!code) {
-                alert('Please enter a meeting code');
+                alert('Please enter a meeting code or invite link');
                 return;
             }
 
@@ -800,6 +835,13 @@
             window.location.href = `/meeting.html?room=${code}`;
         }
 
+        function copyMeetingLink(code) {
+            const link = getMeetingShareLink(code);
+            navigator.clipboard.writeText(link).then(() => {
+                alert('Meeting link copied!');
+            });
+        }
+
         function openCreateMeetingModal() {
             document.getElementById('createMeetingModal').classList.add('active');
         }
@@ -814,7 +856,7 @@
 
         function copyToClipboard(text) {
             navigator.clipboard.writeText(text).then(() => {
-                alert('Meeting code copied!');
+                alert('Copied to clipboard!');
             });
         }
 

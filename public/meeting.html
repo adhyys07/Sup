@@ -344,24 +344,29 @@
         body.light-mode .attachment-meta {
             color: var(--fun-muted);
         }
-        .reaction-tray {
+        .emoji-picker-panel {
             position: fixed;
-            right: 12px;
-            top: 68px;
-            z-index: 25;
-            display: flex;
-            gap: 6px;
-            padding: 8px;
-            border-radius: 14px;
-            background: rgba(8, 23, 44, 0.72);
-            border: 1px solid var(--fun-line);
-            backdrop-filter: blur(10px);
+            left: 50%;
+            bottom: 92px;
+            transform: translateX(-50%);
+            z-index: 35;
+            border-radius: 18px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 20px 45px rgba(2, 6, 23, 0.45);
+            display: none;
         }
-        .reaction-tray button {
-            background: rgba(255,255,255,0.15);
-            border-radius: 10px;
-            padding: 8px 9px;
-            min-width: 34px;
+        .emoji-picker-panel.active {
+            display: block;
+        }
+        #emojiPicker {
+            --background: rgba(12, 22, 40, 0.96);
+            --border-color: rgba(255, 255, 255, 0.15);
+            --button-active-background: rgba(37, 99, 235, 0.35);
+            --button-hover-background: rgba(56, 189, 248, 0.24);
+            --emoji-font-family: 'Segoe UI Emoji', 'Apple Color Emoji', sans-serif;
+            width: 320px;
+            height: 380px;
         }
         .reaction-burst {
             position: fixed;
@@ -617,17 +622,298 @@
         }
         .btn-back:hover { border-color: rgba(255,255,255,0.18); color: #fff; }
 
+        /* New Meeting Room UI Layer */
+        :root {
+            --ui-glass: rgba(9, 16, 35, 0.66);
+            --ui-glass-strong: rgba(7, 13, 30, 0.84);
+            --ui-soft: rgba(255, 255, 255, 0.12);
+            --ui-shadow: 0 22px 52px rgba(3, 8, 20, 0.38);
+            --ui-sky: #38bdf8;
+            --ui-lime: #84cc16;
+            --ui-amber: #f59e0b;
+            --ui-danger: #ef4444;
+        }
+
+        body {
+            font-family: 'Avenir Next', 'Gill Sans', 'Segoe UI', sans-serif;
+            position: relative;
+            color: #eef3ff;
+        }
+
+        body::before,
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        body::before {
+            background:
+                radial-gradient(circle at 12% 22%, rgba(56, 189, 248, 0.24), transparent 34%),
+                radial-gradient(circle at 84% 18%, rgba(132, 204, 22, 0.14), transparent 29%),
+                radial-gradient(circle at 76% 84%, rgba(245, 158, 11, 0.16), transparent 26%);
+            filter: blur(0.5px);
+        }
+
+        body::after {
+            background-image: linear-gradient(transparent 96%, rgba(255, 255, 255, 0.04) 96%);
+            background-size: 100% 6px;
+            opacity: 0.28;
+        }
+
+        .header {
+            height: 64px;
+            padding: 0 24px;
+            background: var(--ui-glass-strong);
+            border-bottom: 1px solid var(--ui-soft);
+            box-shadow: 0 6px 24px rgba(4, 10, 24, 0.3);
+        }
+
+        .header-left h1 {
+            letter-spacing: 0.02em;
+            font-size: 17px;
+            text-transform: uppercase;
+            font-weight: 800;
+        }
+
+        .meeting-code {
+            background: rgba(56, 189, 248, 0.12);
+            border-color: rgba(56, 189, 248, 0.26);
+            color: #d7f3ff;
+            font-weight: 700;
+        }
+
+        .copy-btn,
+        .btn-toggle {
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            backdrop-filter: blur(8px);
+            color: #ebf3ff;
+        }
+
+        .btn-toggle.active {
+            background: linear-gradient(135deg, #0284c7, #2563eb);
+            border-color: rgba(147, 197, 253, 0.7);
+            box-shadow: 0 0 0 2px rgba(125, 211, 252, 0.18);
+        }
+
+        .btn-leave {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            border: 1px solid rgba(254, 202, 202, 0.4);
+            box-shadow: 0 10px 20px rgba(127, 29, 29, 0.35);
+        }
+
+        .main-content {
+            padding: 12px;
+            gap: 12px;
+        }
+
+        .video-section {
+            background: var(--ui-glass);
+            border: 1px solid var(--ui-soft);
+            border-radius: 24px;
+            box-shadow: var(--ui-shadow);
+        }
+
+        .videos-container {
+            padding: 14px;
+            gap: 12px;
+        }
+
+        .video-wrapper {
+            border-radius: 26px;
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            background: linear-gradient(165deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.04));
+            box-shadow: 0 18px 34px rgba(2, 6, 23, 0.35);
+            animation: tile-reveal 0.35s ease;
+        }
+
+        @keyframes tile-reveal {
+            from { transform: translateY(6px) scale(0.985); opacity: 0.65; }
+            to { transform: translateY(0) scale(1); opacity: 1; }
+        }
+
+        .video-label {
+            background: rgba(2, 6, 23, 0.62);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            padding: 5px 11px;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+        }
+
+        .emoji-trigger {
+            font-size: 19px !important;
+            line-height: 1;
+        }
+
+        .chat-section,
+        .tools-section {
+            background: var(--ui-glass);
+            border: 1px solid var(--ui-soft);
+            border-left: 1px solid var(--ui-soft);
+            border-radius: 22px;
+            box-shadow: var(--ui-shadow);
+        }
+
+        .chat-header,
+        .tools-header {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+            font-size: 14px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            font-weight: 800;
+            color: #dbeafe;
+        }
+
+        .chat-message,
+        .tool-card {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        }
+
+        .tool-card {
+            border-radius: 16px;
+        }
+
+        .tool-title {
+            color: #e0f2fe;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+        }
+
+        .tool-input,
+        .tool-textarea,
+        .chat-input input {
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            background: rgba(1, 8, 24, 0.42);
+            color: #ecfeff;
+        }
+
+        .tool-btn,
+        .timer-row button,
+        .chat-input button {
+            background: linear-gradient(135deg, #0284c7, #2563eb);
+            border: 1px solid rgba(191, 219, 254, 0.45);
+            border-radius: 10px;
+            font-weight: 700;
+        }
+
+        .call-controls {
+            height: 76px;
+            width: min(680px, calc(100% - 28px));
+            margin: 0 auto 10px;
+            border-radius: 999px;
+            border: 1px solid var(--ui-soft);
+            background: rgba(3, 10, 24, 0.7);
+            box-shadow: 0 16px 40px rgba(2, 6, 23, 0.45);
+            backdrop-filter: blur(12px);
+        }
+
+        .call-controls button {
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .ctrl-on {
+            background: linear-gradient(135deg, #0ea5e9, #1d4ed8) !important;
+            color: #fff;
+        }
+
+        .ctrl-off {
+            background: linear-gradient(135deg, #ef4444, #b91c1c) !important;
+            color: #fff;
+        }
+
+        .lobby-overlay {
+            background: radial-gradient(circle at top, rgba(15, 23, 42, 0.72), rgba(2, 6, 23, 0.94));
+            backdrop-filter: blur(4px);
+        }
+
+        .lobby-card {
+            background: linear-gradient(165deg, rgba(15, 23, 42, 0.9), rgba(10, 20, 40, 0.92));
+            border: 1px solid rgba(125, 211, 252, 0.2);
+            box-shadow: 0 40px 90px rgba(2, 6, 23, 0.5);
+        }
+
+        .btn-join-now {
+            width: 100%;
+            background: linear-gradient(135deg, #0284c7, #1d4ed8);
+            border: 1px solid rgba(191, 219, 254, 0.45);
+        }
+
+        body.light-mode .video-section,
+        body.light-mode .chat-section,
+        body.light-mode .tools-section,
+        body.light-mode .call-controls {
+            background: rgba(255, 255, 255, 0.9);
+            border-color: rgba(15, 23, 42, 0.12);
+            color: #0f172a;
+        }
+
+        body.light-mode .chat-message,
+        body.light-mode .tool-card,
+        body.light-mode .video-label,
+        body.light-mode .tool-input,
+        body.light-mode .tool-textarea,
+        body.light-mode .chat-input input {
+            background: rgba(255, 255, 255, 0.9);
+            color: #0f172a;
+            border-color: rgba(15, 23, 42, 0.14);
+        }
+
+        body.light-mode #emojiPicker {
+            --background: rgba(255, 255, 255, 0.98);
+            --border-color: rgba(15, 23, 42, 0.14);
+            --input-font-color: #0f172a;
+            --button-hover-background: rgba(14, 165, 233, 0.15);
+        }
+
         @media (max-width: 640px) {
             .chat-section { width: 100%; position: absolute; bottom: 68px; top: 56px; z-index: 5; }
             .tools-section { width: 100%; position: absolute; bottom: 68px; top: 56px; z-index: 6; }
             .videos-container.p2 { grid-template-columns: 1fr; grid-template-rows: repeat(2, 1fr); }
             .videos-container.p3 .video-wrapper:last-child { grid-column: span 1; }
-            .reaction-tray {
-                top: auto;
-                bottom: 78px;
-                left: 12px;
-                right: 12px;
-                justify-content: center;
+            .header {
+                padding: 0 12px;
+                height: 58px;
+            }
+            .header-left h1 {
+                display: none;
+            }
+            .meeting-code {
+                max-width: 130px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            .main-content {
+                padding: 8px;
+            }
+            .video-section {
+                border-radius: 16px;
+            }
+            .call-controls {
+                width: calc(100% - 14px);
+                gap: 8px;
+                height: 70px;
+                margin-bottom: 7px;
+            }
+            .call-controls button {
+                width: 43px;
+                height: 43px;
+            }
+            .emoji-picker-panel {
+                left: 8px;
+                right: 8px;
+                transform: none;
+                bottom: 84px;
+            }
+            #emojiPicker {
+                width: min(100vw - 16px, 360px);
+                height: 320px;
             }
         }
     </style>
@@ -668,14 +954,6 @@
             <button id="toolsToggleBtn" class="btn-toggle" onclick="toggleTools()">Tools</button>
             <button class="btn-leave" onclick="leaveMeeting()">Leave</button>
         </div>
-    </div>
-
-    <div class="reaction-tray" id="reactionTray">
-        <button onclick="sendReaction('👍')">👍</button>
-        <button onclick="sendReaction('😂')">😂</button>
-        <button onclick="sendReaction('🎉')">🎉</button>
-        <button onclick="sendReaction('❤️')">❤️</button>
-        <button onclick="sendReaction('🚀')">🚀</button>
     </div>
 
     <div class="main-content">
@@ -808,6 +1086,7 @@
     <div class="call-controls" id="callControls">
         <button id="callMicBtn" class="ctrl-on" onclick="toggleCallMic()" title="Toggle microphone"></button>
         <button id="callCamBtn" class="ctrl-on" onclick="toggleCallCam()" title="Toggle camera"></button>
+        <button id="emojiPickerBtn" class="ctrl-on emoji-trigger" onclick="toggleEmojiPicker()" title="Emoji reactions">🙂</button>
         <button id="raiseHandBtn" class="ctrl-on" onclick="toggleRaiseHand()" title="Raise hand">✋</button>
         <button id="lockChatBtn" class="ctrl-on" onclick="toggleRoomChat()" title="Lock chat" style="display:none"></button>
         <button id="presentbtn" class="ctrl-on" onclick="togglePresent()" title="Toggle presentation"></button>
@@ -815,7 +1094,12 @@
         <button id="leaveBtn" class="ctrl-on" onclick="leaveMeeting()" title="Leave meeting"></button>
     </div>
 
+    <div class="emoji-picker-panel" id="emojiPickerPanel">
+        <emoji-picker id="emojiPicker"></emoji-picker>
+    </div>
+
     <script src="/socket.io/socket.io.js"></script>
+    <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.js"></script>
     <script>
         const params = new URLSearchParams(window.location.search);
         const room = params.get('room') || 'unknown-room';
@@ -875,6 +1159,9 @@
         const videosContainer = document.getElementById('videosContainer');
         const chatMessages = document.getElementById('chatMessages');
         const chatFileInput = document.getElementById('chatFileInput');
+        const emojiPickerPanel = document.getElementById('emojiPickerPanel');
+        const emojiPickerBtn = document.getElementById('emojiPickerBtn');
+        const emojiPicker = document.getElementById('emojiPicker');
         const whiteboardCanvas = document.getElementById('whiteboardCanvas');
         const whiteboardCtx = whiteboardCanvas ? whiteboardCanvas.getContext('2d') : null;
 
@@ -1459,6 +1746,36 @@
             el.textContent = emoji;
             document.body.appendChild(el);
             setTimeout(() => el.remove(), 2000);
+        }
+
+        function toggleEmojiPicker() {
+            if (!emojiPickerPanel) return;
+            emojiPickerPanel.classList.toggle('active');
+        }
+
+        function closeEmojiPicker() {
+            if (!emojiPickerPanel) return;
+            emojiPickerPanel.classList.remove('active');
+        }
+
+        function initEmojiPicker() {
+            if (!emojiPicker) return;
+
+            emojiPicker.addEventListener('emoji-click', (event) => {
+                const emoji = event?.detail?.unicode;
+                if (!emoji) return;
+                sendReaction(emoji);
+                closeEmojiPicker();
+            });
+
+            document.addEventListener('click', (event) => {
+                if (!emojiPickerPanel?.classList.contains('active')) return;
+                const clickedInsidePanel = emojiPickerPanel.contains(event.target);
+                const clickedTrigger = emojiPickerBtn?.contains(event.target);
+                if (!clickedInsidePanel && !clickedTrigger) {
+                    closeEmojiPicker();
+                }
+            });
         }
 
         function renderHandIndicator(userId, raised) {
@@ -2599,8 +2916,9 @@
         }
 
         function copyMeetingCode() {
-            navigator.clipboard.writeText(room).then(() => {
-                alert('Meeting code copied!');
+            const shareLink = window.location.origin + '/join/' + encodeURIComponent(room);
+            navigator.clipboard.writeText(shareLink).then(() => {
+                alert('Meeting link copied!');
             });
         }
 
@@ -2623,6 +2941,7 @@
         window.addEventListener('load', () => {
             applyStoredTheme();
             initStaticIcons();
+            initEmojiPicker();
             initProductivityTools();
             initLobby();
         });
