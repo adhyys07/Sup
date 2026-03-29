@@ -210,23 +210,49 @@
 
         /* ── Chat sidebar ── */
         .chat-section {
-            width: 320px; flex-shrink: 0;
+            width: 0; flex-shrink: 0;
             background: rgba(8, 23, 44, 0.78); border-left: 1px solid var(--fun-line);
             backdrop-filter: blur(14px);
-            display: none; flex-direction: column; overflow: hidden;
+            display: flex; flex-direction: column; overflow: hidden;
+            min-width: 0;
+            opacity: 0;
+            transform: translateX(18px);
+            pointer-events: none;
+            visibility: hidden;
+            transition: width 0.26s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease, transform 0.24s ease, visibility 0s linear 0.26s;
         }
-        .chat-section.active { display: flex; }
+        .chat-section.active {
+            width: 320px;
+            opacity: 1;
+            transform: translateX(0);
+            pointer-events: auto;
+            visibility: visible;
+            transition-delay: 0s, 0s, 0s, 0s;
+        }
         .tools-section {
-            width: 340px;
+            width: 0;
             flex-shrink: 0;
             background: rgba(9, 27, 50, 0.82);
             border-left: 1px solid var(--fun-line);
             backdrop-filter: blur(14px);
-            display: none;
+            display: flex;
             flex-direction: column;
             overflow: hidden;
+            min-width: 0;
+            opacity: 0;
+            transform: translateX(18px);
+            pointer-events: none;
+            visibility: hidden;
+            transition: width 0.26s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease, transform 0.24s ease, visibility 0s linear 0.26s;
         }
-        .tools-section.active { display: flex; }
+        .tools-section.active {
+            width: 340px;
+            opacity: 1;
+            transform: translateX(0);
+            pointer-events: auto;
+            visibility: visible;
+            transition-delay: 0s, 0s, 0s, 0s;
+        }
         .tools-header {
             padding: 15px 18px;
             border-bottom: 1px solid var(--fun-line);
@@ -348,16 +374,23 @@
             position: fixed;
             left: 50%;
             bottom: 92px;
-            transform: translateX(-50%);
+            transform: translateX(-50%) translateY(10px) scale(0.97);
             z-index: 35;
             border-radius: 18px;
             overflow: hidden;
             border: 1px solid rgba(255, 255, 255, 0.2);
             box-shadow: 0 20px 45px rgba(2, 6, 23, 0.45);
-            display: none;
+            opacity: 0;
+            pointer-events: none;
+            visibility: hidden;
+            transition: opacity 0.18s ease, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 0.22s;
         }
         .emoji-picker-panel.active {
-            display: block;
+            opacity: 1;
+            transform: translateX(-50%) translateY(0) scale(1);
+            pointer-events: auto;
+            visibility: visible;
+            transition-delay: 0s, 0s, 0s;
         }
         #emojiPicker {
             --background: rgba(12, 22, 40, 0.96);
@@ -833,10 +866,34 @@
             backdrop-filter: blur(4px);
         }
 
+        .lobby-overlay.closing {
+            animation: lobby-fade-out 0.22s ease forwards;
+        }
+
         .lobby-card {
             background: linear-gradient(165deg, rgba(15, 23, 42, 0.9), rgba(10, 20, 40, 0.92));
             border: 1px solid rgba(125, 211, 252, 0.2);
             box-shadow: 0 40px 90px rgba(2, 6, 23, 0.5);
+            animation: lobby-pop-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .lobby-overlay.closing .lobby-card {
+            animation: lobby-pop-out 0.22s ease forwards;
+        }
+
+        @keyframes lobby-pop-in {
+            from { opacity: 0; transform: translateY(10px) scale(0.97); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        @keyframes lobby-pop-out {
+            from { opacity: 1; transform: translateY(0) scale(1); }
+            to { opacity: 0; transform: translateY(8px) scale(0.98); }
+        }
+
+        @keyframes lobby-fade-out {
+            from { opacity: 1; }
+            to { opacity: 0; }
         }
 
         .btn-join-now {
@@ -873,8 +930,10 @@
         }
 
         @media (max-width: 640px) {
-            .chat-section { width: 100%; position: absolute; bottom: 68px; top: 56px; z-index: 5; }
-            .tools-section { width: 100%; position: absolute; bottom: 68px; top: 56px; z-index: 6; }
+            .chat-section { width: 0; position: absolute; bottom: 68px; top: 56px; z-index: 5; left: 0; right: 0; }
+            .chat-section.active { width: 100%; }
+            .tools-section { width: 0; position: absolute; bottom: 68px; top: 56px; z-index: 6; left: 0; right: 0; }
+            .tools-section.active { width: 100%; }
             .videos-container.p2 { grid-template-columns: 1fr; grid-template-rows: repeat(2, 1fr); }
             .videos-container.p3 .video-wrapper:last-child { grid-column: span 1; }
             .header {
@@ -908,8 +967,11 @@
             .emoji-picker-panel {
                 left: 8px;
                 right: 8px;
-                transform: none;
+                transform: translateY(10px) scale(0.97);
                 bottom: 84px;
+            }
+            .emoji-picker-panel.active {
+                transform: translateY(0) scale(1);
             }
             #emojiPicker {
                 width: min(100vw - 16px, 360px);
@@ -1629,7 +1691,14 @@
         async function joinCall() {
             if (isWaitingForApproval) return;
             // Hide lobby, show meeting
-            document.getElementById('lobbyOverlay').classList.add('hidden');
+            const lobbyOverlay = document.getElementById('lobbyOverlay');
+            if (lobbyOverlay) {
+                lobbyOverlay.classList.add('closing');
+                setTimeout(() => {
+                    lobbyOverlay.classList.add('hidden');
+                    lobbyOverlay.classList.remove('closing');
+                }, 220);
+            }
 
             // Sync in-call buttons with lobby state
             syncCallControls();

@@ -432,6 +432,12 @@
                 return;
             }
 
+            if (password.length < 6) {
+                errorDiv.textContent = 'Password must be at least 6 characters';
+                errorDiv.style.display = 'block';
+                return;
+            }
+
             try {
                 const response = await fetch('/api/register', {
                     method: 'POST',
@@ -442,17 +448,88 @@
                 const data = await response.json();
 
                 if (!response.ok) {
-                    errorDiv.textContent = data.error || 'Registration failed';
+                    // Handle provider mismatch
+                    if (data.code === 'PROVIDER_MISMATCH') {
+                        const provider = data.existingProvider || 'another provider';
+                        errorDiv.innerHTML = `
+                            <div>
+                                ${data.error}
+                            </div>
+                            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(180, 56, 52, 0.16);">
+                                <p style="font-size: 13px; margin-bottom: 10px;">Want to link accounts instead?</p>
+                                <button type="button" onclick="toggleForm(); document.getElementById('loginEmail').value='${email}';" style="background: var(--brand-2); width: auto; padding: 8px 16px; display: inline-block;">
+                                    Log in with ${provider.charAt(0).toUpperCase() + provider.slice(1)}
+                                </button>
+                            </div>
+                        `;
+                    } else {
+                        errorDiv.textContent = data.error || 'Registration failed';
+                    }
                     errorDiv.style.display = 'block';
                     return;
                 }
 
-                localStorage.setItem('token', data.token);
-                window.location.href = '/dashboard.html';
+                // Show success message for email verification
+                errorDiv.style.display = 'none';
+                const registerForm = document.getElementById('registerForm');
+                registerForm.innerHTML = `
+                    <div style="text-align: center; padding: 40px 0;">
+                        <div style="font-size: 48px; margin-bottom: 20px;">📧</div>
+                        <h2 style="margin-bottom: 15px;">Verify Your Email</h2>
+                        <p style="color: var(--muted); margin-bottom: 20px; line-height: 1.5;">
+                            A verification link has been sent to <strong>${email}</strong>.
+                            Please check your inbox and click the link to verify your email address.
+                        </p>
+                        <p style="color: var(--muted); font-size: 14px; margin-bottom: 30px;">
+                            The link will expire in 24 hours.
+                        </p>
+                        <div style="border-top: 1px solid var(--line); padding-top: 20px;">
+                            <p style="color: var(--muted); font-size: 14px; margin-bottom: 10px;">
+                                Didn't receive the email?
+                            </p>
+                            <button onclick="resendVerificationEmail('${email}')" style="background: var(--brand-2); width: auto; padding: 10px 24px;">
+                                Resend Verification Link
+                            </button>
+                            <p style="color: var(--muted); font-size: 12px; margin-top: 15px;">
+                                <a onclick="toggleForm(); resetForms();" style="color: var(--brand); cursor: pointer; text-decoration: none;">Back to Login</a>
+                            </p>
+                        </div>
+                    </div>
+                `;
             } catch (err) {
                 errorDiv.textContent = 'Network error';
                 errorDiv.style.display = 'block';
             }
+        }
+
+        async function resendVerificationEmail(email) {
+            try {
+                const response = await fetch('/api/resend-verification', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert('Verification email sent! Please check your inbox.');
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to resend email'));
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        function resetForms() {
+            document.getElementById('registerName').value = '';
+            document.getElementById('registerEmail').value = '';
+            document.getElementById('registerPassword').value = '';
+            document.getElementById('registerError').style.display = 'none';
+            document.getElementById('loginEmail').value = '';
+            document.getElementById('loginPassword').value = '';
+            document.getElementById('loginError').style.display = 'none';
         }
 
         async function login() {
@@ -476,8 +553,29 @@
                 const data = await response.json();
 
                 if (!response.ok) {
-                    errorDiv.textContent = data.error || 'Login failed';
+                    if (response.status === 403) {
+                        // Email not verified
+                        const suggestions = document.createElement('div');
+                        suggestions.innerHTML = `
+                            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(180, 56, 52, 0.16);">
+                                <p style="font-size: 13px; margin-bottom: 10px;">Didn't get the email?</p>
+                                <button onclick="resendVerificationEmail('${email}')" style="background: var(--brand-2); width: auto; padding: 8px 16px; margin-top: 5px;">
+                                    Resend Verification Link
+                                </button>
+                            </div>
+                        `;
+                        errorDiv.innerHTML = data.error + suggestions.innerHTML;
+                    } else {
+                        errorDiv.textContent = data.error || 'Login failed';
+                    }
                     errorDiv.style.display = 'block';
+                    return;
+                }
+
+                // Handle 2FA if required
+                if (data.requiredTwoFactor) {
+                    localStorage.setItem('temptoken', data.temptoken);
+                    window.location.href = '/2fa.html'; // You would create this page
                     return;
                 }
 

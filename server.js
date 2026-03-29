@@ -9,12 +9,13 @@ import { google } from 'googleapis';
 import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
-import { randomUUID } from 'crypto';
+import { randomUUID, randomBytes } from 'crypto';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { Strategy as GitHubStrategy } from 'passport-github2';
+import nodemailer from 'nodemailer';
 import 'dotenv/config';
 import { db } from './db.js';
-import { users, meetings, meetingParticipants, messages, userTwoFactor, meetingReactions, raisedHands, meetingWaitingRoom } from './schema.js';
+import { users, meetings, meetingParticipants, messages, userTwoFactor, meetingReactions, raisedHands, meetingWaitingRoom, oauthConnections } from './schema.js';
 import { eq, or, and, inArray, sql } from 'drizzle-orm';
 import speakeasy from 'speakeasy';
 import ratelimit from 'express-rate-limit';
@@ -40,6 +41,26 @@ const GOOGLE_CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
 const TEMP_ATTACHMENTS_DIR = path.join(process.cwd(), 'temp', 'meeting-attachments');
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
+// Email configuration (using Gmail or custom SMTP)
+const emailTransporter = nodemailer.createTransport({
+    service: process.env.EMAIL_SERVICE || 'gmail',
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD,
+    }
+});
+
+// Test email configuration
+if (process.env.EMAIL_USER) {
+    emailTransporter.verify((error, success) => {
+        if (error) {
+            console.log('Email service error:', error);
+        } else {
+            console.log('Email service ready');
+        }
+    });
+}
+
 fs.mkdirSync(TEMP_ATTACHMENTS_DIR, { recursive: true });
 
 const roomRuntimeMessages = new Map();
@@ -61,6 +82,32 @@ const authLimiter = ratelimit({
 });
 
 app.use('/api/', apiLimiter);
+
+// Helper function to send verification email
+async function sendVerificationEmail(email, name, token) {
+    const verificationUrl = `${BASE_URL}/verify-email?token=${token}`;
+    const mailOptions = {
+        from: process.env.EMAIL_USER || 'noreply@sup.app',
+        to: email,
+        subject: 'Verify your Sup account',
+        html: `
+            <h2>Welcome to Sup, ${name}!</h2>
+            <p>Please verify your email address to activate your account.</p>
+            <p><a href="${verificationUrl}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Verify Email</a></p>
+            <p>Or copy and paste this link: ${verificationUrl}</p>
+            <p>This link will expire in 24 hours.</p>
+            <p>If you didn't create this account, please ignore this email.</p>
+        `
+    };
+
+    try {
+        await emailTransporter.sendMail(mailOptions);
+        return true;
+    } catch (error) {
+        console.error('Error sending verification email:', error);
+        return false;
+    }
+}
 
 function getRoomAttachmentDir(roomCode) {
     return path.join(TEMP_ATTACHMENTS_DIR, roomCode);
@@ -215,23 +262,133 @@ async function isHostForRoom(userId, roomCode) {
     return instantRoomHosts.get(roomCode) === userId;
 }
 // ============ PASSPORT CONFIG ============
-async function findOrCreateOAuthUser(profile, provider) {
-    const email = profile.emails?.[0]?.value;
-    if (!email) throw new Error('No email from provider');
+async function findOrCreateOAuthUser(profile, provider, linkingInfo = null) {
+    const providerId = String(profile.id);
+    const email = profile.emails?.[0]?.value || null;
+    const providerDisplayName = provider === 'github'
+        ? (profile.username || profile.displayName || email || `github-${providerId}`)
+        : (profile.displayName || email);
 
-    const existing = await db.select().from(users).where(eq(users.email, email));
+    // GitHub may not provide email for some accounts. In that case,
+    // try to find user by existing provider connection first.
+    if (!email && provider === 'github' && !(linkingInfo && linkingInfo.action === 'link')) {
+        const existingOAuthByProviderId = await db.select().from(oauthConnections)
+            .where(and(eq(oauthConnections.provider, provider), eq(oauthConnections.providerId, providerId)));
 
-    if (existing.length > 0) {
-        return existing[0];
+        if (existingOAuthByProviderId.length > 0) {
+            const oauthRow = existingOAuthByProviderId[0];
+            await db.update(oauthConnections)
+                .set({
+                    displayName: providerDisplayName,
+                    avatar: profile.photos?.[0]?.value || null,
+                    updatedAt: new Date()
+                })
+                .where(eq(oauthConnections.id, oauthRow.id));
+
+            const linkedUser = await db.select().from(users).where(eq(users.id, oauthRow.userId));
+            if (linkedUser.length > 0) return linkedUser[0];
+        }
     }
 
+    const existing = email
+        ? await db.select().from(users).where(eq(users.email, email))
+        : [];
+
+    // If this is an account linking request
+    if (linkingInfo && linkingInfo.action === 'link' && linkingInfo.userId) {
+        const linkedUser = await db.select().from(users).where(eq(users.id, linkingInfo.userId));
+        
+        if (linkedUser.length > 0) {
+            // Check if this provider is already linked
+            const existingOAuth = await db.select().from(oauthConnections)
+                .where(and(eq(oauthConnections.userId, linkingInfo.userId), eq(oauthConnections.provider, provider)));
+            
+            if (existingOAuth.length > 0) {
+                // Update existing connection
+                await db.update(oauthConnections)
+                    .set({
+                        providerId,
+                        email: email || linkedUser[0].email || null,
+                        displayName: providerDisplayName,
+                        avatar: profile.photos?.[0]?.value || null,
+                        updatedAt: new Date()
+                    })
+                    .where(eq(oauthConnections.id, existingOAuth[0].id));
+            } else {
+                // Create new OAuth connection
+                await db.insert(oauthConnections).values({
+                    userId: linkingInfo.userId,
+                    provider,
+                    providerId,
+                    email: email || linkedUser[0].email || null,
+                    displayName: providerDisplayName,
+                    avatar: profile.photos?.[0]?.value || null
+                });
+            }
+            
+            return linkedUser[0];
+        } else {
+            throw new Error('User not found for linking');
+        }
+    }
+
+    if (existing.length > 0) {
+        const existingUser = existing[0];
+
+        // Ensure OAuth connection exists for returning users who authenticate via OAuth.
+        const existingOAuth = await db.select().from(oauthConnections)
+            .where(and(eq(oauthConnections.userId, existingUser.id), eq(oauthConnections.provider, provider)));
+
+        if (existingOAuth.length > 0) {
+            await db.update(oauthConnections)
+                .set({
+                    providerId,
+                    email: email || existingUser.email || null,
+                    displayName: providerDisplayName,
+                    avatar: profile.photos?.[0]?.value || null,
+                    updatedAt: new Date()
+                })
+                .where(eq(oauthConnections.id, existingOAuth[0].id));
+        } else {
+            await db.insert(oauthConnections).values({
+                userId: existingUser.id,
+                provider,
+                providerId,
+                email: email || existingUser.email || null,
+                displayName: providerDisplayName,
+                avatar: profile.photos?.[0]?.value || null
+            });
+        }
+
+        return existingUser;
+    }
+
+    // New local user record cannot be created without email.
+    if (!email) {
+        throw new Error('No email from provider. Make your GitHub email public or link GitHub from profile settings first.');
+    }
+
+    // Create new user
     const result = await db.insert(users).values({
         email,
         name: profile.displayName || email,
         avatar: profile.photos?.[0]?.value || null,
         authProvider: provider,
-        authProviderId: profile.id
+        authProviderId: providerId,
+        emailVerified: true  // OAuth users are auto-verified
     }).returning();
+
+    // Create OAuth connection entry
+    if (result.length > 0) {
+        await db.insert(oauthConnections).values({
+            userId: result[0].id,
+            provider,
+            providerId,
+            email,
+            displayName: providerDisplayName,
+            avatar: profile.photos?.[0]?.value || null
+        });
+    }
 
     return result[0];
 }
@@ -242,10 +399,22 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
         clientSecret: process.env.GOOGLE_CLIENT_SECRET,
         callbackURL: `${BASE_URL}/auth/google/callback`,
         scope: ['profile', 'email'],
-        proxy: true
-    }, async (accessToken, refreshToken, profile, done) => {
+        proxy: true,
+        passReqToCallback: true
+    }, async (req, accessToken, refreshToken, profile, done) => {
         try {
-            const user = await findOrCreateOAuthUser(profile, 'google');
+            let linkingInfo = null;
+            
+            // Check if this is an account linking request
+            try {
+                if (req.query && req.query.state) {
+                    linkingInfo = jwt.verify(req.query.state, JWT_SECRET);
+                }
+            } catch (err) {
+                // Not a valid linking token, proceed with normal auth
+            }
+
+            const user = await findOrCreateOAuthUser(profile, 'google', linkingInfo);
             done(null, user);
         } catch (err) {
             done(err, null);
@@ -278,10 +447,22 @@ if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
         clientID: process.env.GITHUB_CLIENT_ID,
         clientSecret: process.env.GITHUB_CLIENT_SECRET,
         callbackURL: `${BASE_URL}/auth/github/callback`,
-        scope: ['user:email']
-    }, async (accessToken, refreshToken, profile, done) => {
+        scope: ['user:email'],
+        passReqToCallback: true
+    }, async (req, accessToken, refreshToken, profile, done) => {
         try {
-            const user = await findOrCreateOAuthUser(profile, 'github');
+            let linkingInfo = null;
+            
+            // Check if this is an account linking request
+            try {
+                if (req.query && req.query.state) {
+                    linkingInfo = jwt.verify(req.query.state, JWT_SECRET);
+                }
+            } catch (err) {
+                // Not a valid linking token, proceed with normal auth
+            }
+
+            const user = await findOrCreateOAuthUser(profile, 'github', linkingInfo);
             done(null, user);
         } catch (err) {
             done(err, null);
@@ -296,6 +477,20 @@ app.get('/auth/google/callback',
     passport.authenticate('google', { session: false, failureRedirect: '/' }),
     (req, res) => {
         const token = jwt.sign({ id: req.user.id }, JWT_SECRET);
+        
+        // Check if this was an account linking flow
+        if (req.query.state) {
+            try {
+                const decoded = jwt.verify(req.query.state, JWT_SECRET);
+                if (decoded.action === 'link') {
+                    // Redirect to profile with success message
+                    return res.redirect(`/profile.html?linked=google&token=${token}`);
+                }
+            } catch (err) {
+                // Continue with normal auth flow
+            }
+        }
+        
         res.redirect(`/auth-success.html?token=${token}`);
     }
 );
@@ -351,6 +546,20 @@ app.get('/auth/github/callback',
     passport.authenticate('github', { session: false, failureRedirect: '/' }),
     (req, res) => {
         const token = jwt.sign({ id: req.user.id }, JWT_SECRET);
+        
+        // Check if this was an account linking flow
+        if (req.query.state) {
+            try {
+                const decoded = jwt.verify(req.query.state, JWT_SECRET);
+                if (decoded.action === 'link') {
+                    // Redirect to profile with success message
+                    return res.redirect(`/profile.html?linked=github&token=${token}`);
+                }
+            } catch (err) {
+                // Continue with normal auth flow
+            }
+        }
+        
         res.redirect(`/auth-success.html?token=${token}`);
     }
 );
@@ -373,17 +582,64 @@ const verifyToken = (req, res, next) => {
 app.post('/api/register', authLimiter, async (req, res) => {
     try {
         const { email, password, name } = req.body;
+
+        // Validate input
+        if (!email || !password || !name) {
+            return res.status(400).json({ error: 'Email, password, and name are required' });
+        }
+
+        if (password.length < 6) {
+            return res.status(400).json({ error: 'Password must be at least 6 characters' });
+        }
+
+        // Check if email already exists
+        const existingUser = await db.select().from(users).where(eq(users.email, email));
+        if (existingUser.length > 0) {
+            const user = existingUser[0];
+            // Check if they signed up with a different provider
+            if (user.authProvider !== 'local' && user.authProvider) {
+                return res.status(409).json({ 
+                    error: `This email is already registered using ${user.authProvider}. Please log in with ${user.authProvider} instead or use a different email.`,
+                    existingProvider: user.authProvider,
+                    code: 'PROVIDER_MISMATCH'
+                });
+            }
+            return res.status(400).json({ error: 'Email already registered' });
+        }
+
+        // Hash password
         const hashedPassword = await bcrypt.hash(password, 10);
-        
+
+        // Generate verification token (valid for 24 hours)
+        const verificationToken = randomBytes(32).toString('hex');
+        const tokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+        // Create user with unverified status
         const result = await db.insert(users).values({
             email,
             password: hashedPassword,
-            name
+            name,
+            authProvider: 'local',
+            emailVerified: false,
+            emailVerificationToken: verificationToken,
+            emailVerificationTokenExpires: tokenExpires
         }).returning({ id: users.id, email: users.email, name: users.name });
-        
-        const token = jwt.sign({ id: result[0].id }, JWT_SECRET);
-        res.json({ token, user: result[0] });
+
+        // Send verification email
+        const emailSent = await sendVerificationEmail(email, name, verificationToken);
+
+        if (!emailSent && process.env.EMAIL_USER) {
+            // If email fails to send and email is configured, delete the user
+            await db.delete(users).where(eq(users.id, result[0].id));
+            return res.status(500).json({ error: 'Failed to send verification email. Please try again.' });
+        }
+
+        res.status(201).json({ 
+            message: 'Account created! Please check your email to verify your address.',
+            email: email
+        });
     } catch (err) {
+        console.error('Registration error:', err);
         res.status(400).json({ error: err.message });
     }
 });
@@ -404,6 +660,11 @@ app.post('/api/login', authLimiter, async (req, res) => {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
+        // Check if email is verified (only for local auth)
+        if (user.authProvider === 'local' && !user.emailVerified) {
+            return res.status(403).json({ error: 'Please verify your email before logging in. Check your inbox for a verification link.' });
+        }
+
         const twoFa = await db.select().from(userTwoFactor).where(eq(userTwoFactor.userId, user.id));
 
         if(twoFa[0]?.enabled && !twoFactorToken){
@@ -422,6 +683,99 @@ app.post('/api/login', authLimiter, async (req, res) => {
         const token = jwt.sign({ id: user.id }, JWT_SECRET);
         res.json({ token, user: { id: user.id, email: user.email, name: user.name } });
     } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+});
+
+// Verify email endpoint
+app.post('/api/verify-email', authLimiter, async (req, res) => {
+    try {
+        const { token } = req.body;
+
+        if (!token) {
+            return res.status(400).json({ error: 'Verification token is required' });
+        }
+
+        // Find user with the verification token
+        const result = await db.select().from(users).where(eq(users.emailVerificationToken, token));
+
+        if (result.length === 0) {
+            return res.status(400).json({ error: 'Invalid verification token' });
+        }
+
+        const user = result[0];
+
+        // Check if token has expired
+        if (user.emailVerificationTokenExpires && new Date() > user.emailVerificationTokenExpires) {
+            return res.status(400).json({ error: 'Verification token has expired. Please sign up again.' });
+        }
+
+        // Mark email as verified and clear the token
+        await db.update(users)
+            .set({
+                emailVerified: true,
+                emailVerificationToken: null,
+                emailVerificationTokenExpires: null,
+                updatedAt: new Date()
+            })
+            .where(eq(users.id, user.id));
+
+        res.json({ 
+            message: 'Email verified successfully! You can now log in.' 
+        });
+    } catch (err) {
+        console.error('Email verification error:', err);
+        res.status(400).json({ error: err.message });
+    }
+});
+
+// Resend verification email
+app.post('/api/resend-verification', authLimiter, async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({ error: 'Email is required' });
+        }
+
+        const result = await db.select().from(users).where(eq(users.email, email));
+
+        if (result.length === 0) {
+            return res.status(400).json({ error: 'User not found' });
+        }
+
+        const user = result[0];
+
+        // Check if already verified
+        if (user.emailVerified) {
+            return res.status(400).json({ error: 'Email is already verified' });
+        }
+
+        // Generate new verification token
+        const verificationToken = randomBytes(32).toString('hex');
+        const tokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+        // Update user with new token
+        await db.update(users)
+            .set({
+                emailVerificationToken: verificationToken,
+                emailVerificationTokenExpires: tokenExpires,
+                updatedAt: new Date()
+            })
+            .where(eq(users.id, user.id));
+
+        // Send verification email
+        const emailSent = await sendVerificationEmail(user.email, user.name, verificationToken);
+
+        if (!emailSent) {
+            return res.status(500).json({ error: 'Failed to send verification email. Please try again.' });
+        }
+
+        res.json({ 
+            message: 'Verification email sent! Please check your inbox.' 
+        });
+    } catch (err) {
+        console.error('Resend verification error:', err);
         res.status(400).json({ error: err.message });
     }
 });
@@ -499,6 +853,203 @@ app.put('/api/user/profile', verifyToken, async (req, res) => {
         
         res.json(result[0]);
     } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+});
+
+        // Get connected accounts/providers
+        app.get('/api/user/connections', verifyToken, async (req, res) => {
+            try {
+                console.log('Fetching connections for user:', req.userId);
+                const user = await db.select({
+                    id: users.id,
+                    email: users.email,
+                    name: users.name,
+                    password: users.password,
+                    authProvider: users.authProvider,
+                    authProviderId: users.authProviderId
+                }).from(users).where(eq(users.id, req.userId));
+                
+                if (user.length === 0) {
+                    console.log('User not found:', req.userId);
+                    return res.status(404).json({ error: 'User not found' });
+                }
+
+                const userData = user[0];
+                console.log('User data:', userData.id, userData.email);
+        const connections = {};
+
+        // Check if they have local auth (email & password)
+        if (userData.password) {
+            connections.local = {
+                provider: 'local',
+                connected: true,
+                type: 'Email & Password'
+            };
+        }
+
+        // Check OAuth connections from the oauth_connections table.
+        // If the table is missing in the current DB, fall back to legacy users.authProvider.
+        let oauthConns = [];
+        try {
+            oauthConns = await db.select().from(oauthConnections).where(eq(oauthConnections.userId, req.userId));
+            console.log('OAuth connections found:', oauthConns.length);
+        } catch (oauthErr) {
+            const oauthErrorMessage = oauthErr?.message || '';
+            console.error('OAuth connections query failed:', oauthErrorMessage);
+
+            const missingOauthTable = oauthErrorMessage.includes('oauth_connections') && oauthErrorMessage.includes('does not exist');
+            if (missingOauthTable) {
+                console.log('Falling back to legacy authProvider field for user:', req.userId);
+                if (userData.authProvider && userData.authProvider !== 'local') {
+                    oauthConns = [{
+                        provider: userData.authProvider,
+                        providerId: userData.authProviderId,
+                        email: userData.email,
+                        displayName: userData.name
+                    }];
+                }
+            } else {
+                throw oauthErr;
+            }
+        }
+        
+        oauthConns.forEach(conn => {
+            console.log('Processing OAuth connection:', conn.provider, conn.providerId);
+            if (conn.provider === 'google') {
+                connections.google = {
+                    provider: 'google',
+                    connected: true,
+                    type: 'Google',
+                    email: conn.email,
+                    displayName: conn.displayName
+                };
+            } else if (conn.provider === 'github') {
+                const githubUsername = conn.displayName ? conn.displayName.replace(/^@/, '') : null;
+                connections.github = {
+                    provider: 'github',
+                    connected: true,
+                    type: 'GitHub',
+                    displayName: conn.displayName,
+                    githubUsername
+                };
+            }
+        });
+
+        console.log('Sending connections response:', Object.keys(connections));
+        res.json({ connections });
+    } catch (err) {
+        console.error('Error fetching connections:', err);
+        console.error('Stack trace:', err.stack);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Link Google account (requires current auth)
+app.post('/api/user/link-provider/google', verifyToken, async (req, res) => {
+    try {
+        // Create a state token that includes the user ID and action
+        const linkingState = jwt.sign(
+            { userId: req.userId, action: 'link', provider: 'google' }, 
+            JWT_SECRET, 
+            { expiresIn: '30m' }
+        );
+
+        const googleAuthUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+        googleAuthUrl.searchParams.append('client_id', process.env.GOOGLE_CLIENT_ID);
+        googleAuthUrl.searchParams.append('redirect_uri', `${BASE_URL}/auth/google/callback`);
+        googleAuthUrl.searchParams.append('response_type', 'code');
+        googleAuthUrl.searchParams.append('scope', 'openid email profile');
+        googleAuthUrl.searchParams.append('state', linkingState);
+
+        res.json({
+            redirectUrl: googleAuthUrl.toString()
+        });
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+});
+
+// Link GitHub account
+app.post('/api/user/link-provider/github', verifyToken, async (req, res) => {
+    try {
+        const linkingState = jwt.sign(
+            { userId: req.userId, action: 'link', provider: 'github' }, 
+            JWT_SECRET, 
+            { expiresIn: '30m' }
+        );
+
+        const githubAuthUrl = new URL('https://github.com/login/oauth/authorize');
+        githubAuthUrl.searchParams.append('client_id', process.env.GITHUB_CLIENT_ID);
+        githubAuthUrl.searchParams.append('redirect_uri', `${BASE_URL}/auth/github/callback`);
+        githubAuthUrl.searchParams.append('scope', 'user:email');
+        githubAuthUrl.searchParams.append('state', linkingState);
+
+        res.json({
+            redirectUrl: githubAuthUrl.toString()
+        });
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+});
+
+// Unlink provider
+app.post('/api/user/unlink-provider/:provider', verifyToken, async (req, res) => {
+    try {
+        const { provider } = req.params;
+        const validProviders = ['google', 'github'];
+
+        if (!validProviders.includes(provider)) {
+            return res.status(400).json({ error: 'Invalid provider' });
+        }
+
+        // Get user
+        const user = await db.select({
+            id: users.id,
+            password: users.password
+        }).from(users).where(eq(users.id, req.userId));
+        if (user.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const userData = user[0];
+
+        // Check how many authentication methods the user has
+        let oauthConns = [];
+        try {
+            oauthConns = await db.select().from(oauthConnections)
+                .where(eq(oauthConnections.userId, req.userId));
+        } catch (oauthErr) {
+            const oauthErrorMessage = oauthErr?.message || '';
+            const missingOauthTable = oauthErrorMessage.includes('oauth_connections') && oauthErrorMessage.includes('does not exist');
+
+            if (missingOauthTable) {
+                oauthConns = [];
+            } else {
+                throw oauthErr;
+            }
+        }
+        
+        const hasPassword = !!userData.password;
+        const oauthProviderCount = oauthConns.length;
+
+        // Make sure they have another way to login
+        if (!hasPassword && oauthProviderCount <= 1) {
+            return res.status(400).json({ 
+                error: 'You must have at least one login method. Keep this provider or set a password first.' 
+            });
+        }
+
+        // Delete the OAuth connection
+        await db.delete(oauthConnections)
+            .where(and(
+                eq(oauthConnections.userId, req.userId),
+                eq(oauthConnections.provider, provider)
+            ));
+
+        res.json({ message: `${provider} account has been unlinked` });
+    } catch (err) {
+        console.error('Error unlinking provider:', err);
         res.status(400).json({ error: err.message });
     }
 });
@@ -1159,7 +1710,24 @@ io.on('connection', (socket) => {
     });
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log(`listening on *:${PORT}`);
-});
+const BASE_PORT = Number(process.env.PORT || 3000);
+const MAX_PORT_RETRIES = 10;
+
+function startServer(port, attempt = 0) {
+    server.listen(port, () => {
+        console.log(`listening on *:${port}`);
+    });
+
+    server.once('error', (err) => {
+        if (err.code === 'EADDRINUSE' && attempt < MAX_PORT_RETRIES) {
+            const nextPort = port + 1;
+            console.warn(`Port ${port} is in use, retrying on ${nextPort}...`);
+            setTimeout(() => startServer(nextPort, attempt + 1), 100);
+            return;
+        }
+
+        throw err;
+    });
+}
+
+startServer(BASE_PORT);

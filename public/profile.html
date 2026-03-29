@@ -4,17 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Profile - Sup!</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
     <style>
         :root {
-            --bg: #eef6ff;
-            --panel: rgba(255, 255, 255, 0.78);
-            --panel-solid: #f8fbff;
-            --line: rgba(15, 23, 42, 0.12);
+            --bg: #f4f7fb;
+            --panel: #ffffff;
+            --panel-solid: #ffffff;
+            --line: #d4dce7;
             --ink: #0f172a;
-            --muted: #475569;
-            --brand: #0ea5e9;
+            --muted: #4b5563;
+            --brand: #2563eb;
             --danger: #ef4444;
-            --shadow: 0 24px 64px rgba(15, 23, 42, 0.12);
+            --shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
         }
         * {
             margin: 0;
@@ -23,11 +24,7 @@
         }
         body {
             font-family: 'Trebuchet MS', 'Avenir Next', 'Segoe UI', sans-serif;
-            background:
-                radial-gradient(circle at 8% 14%, rgba(14, 165, 233, 0.2), transparent 24%),
-                radial-gradient(circle at 85% 10%, rgba(37, 99, 235, 0.16), transparent 22%),
-                radial-gradient(circle at 72% 78%, rgba(245, 158, 11, 0.14), transparent 20%),
-                linear-gradient(180deg, #f8fbff 0%, #eef7ff 52%, #f4f8ff 100%);
+            background: var(--bg);
             color: var(--ink);
             min-height: 100vh;
         }
@@ -35,8 +32,7 @@
             position: sticky;
             top: 0;
             z-index: 10;
-            background: rgba(255, 255, 255, 0.74);
-            backdrop-filter: blur(14px);
+            background: #ffffff;
             padding: 16px 34px;
             display: flex;
             justify-content: space-between;
@@ -50,7 +46,7 @@
             flex: 1;
         }
         h1 {
-            color: #1d4ed8;
+            color: var(--brand);
             font-size: 28px;
             letter-spacing: -0.03em;
         }
@@ -68,8 +64,8 @@
             font-size: 14px;
         }
         nav a:hover {
-            color: #1d4ed8;
-            background: rgba(37, 99, 235, 0.08);
+            color: var(--brand);
+            background: #e9efff;
         }
         .navbar-right {
             display: flex;
@@ -88,10 +84,10 @@
             justify-content: center;
             color: white;
             font-weight: 700;
-            background: linear-gradient(135deg, var(--brand), #2563eb);
+            background: var(--brand);
             background-size: cover;
             background-position: center;
-            box-shadow: 0 12px 20px rgba(21, 71, 52, 0.18);
+            box-shadow: none;
         }
         .avatar {
             width: 42px;
@@ -143,8 +139,7 @@
         .profile-summary,
         .profile-card {
             background: var(--panel);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.55);
+            border: 1px solid var(--line);
             border-radius: 28px;
             box-shadow: var(--shadow);
         }
@@ -182,7 +177,7 @@
         .summary-card {
             padding: 16px 18px;
             border-radius: 16px;
-            background: rgba(255, 255, 255, 0.55);
+            background: #ffffff;
             border: 1px solid var(--line);
         }
         .summary-card strong {
@@ -207,17 +202,17 @@
         input, textarea {
             width: 100%;
             padding: 13px 14px;
-            border: 1px solid rgba(58, 46, 31, 0.14);
+            border: 1px solid #cfd7e3;
             border-radius: 14px;
             font-size: 15px;
             font-family: inherit;
-            background: rgba(255, 255, 255, 0.72);
+            background: #ffffff;
             color: var(--ink);
         }
         input:focus, textarea:focus {
             outline: none;
-            border-color: rgba(14, 165, 233, 0.35);
-            box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.12);
+            border-color: var(--brand);
+            box-shadow: 0 0 0 2px #c7d7ff;
         }
         textarea {
             resize: vertical;
@@ -235,9 +230,102 @@
             font-size: 15px;
         }
         .btn-cancel {
-            background: rgba(255, 255, 255, 0.8);
+            background: #ffffff;
             color: var(--ink);
             border: 1px solid var(--line);
+        }
+        .btn-secondary {
+            background: #e9efff;
+            color: var(--brand);
+            border: 1px solid #c7d7ff;
+        }
+        .btn-secondary:hover {
+            background: #dce7ff;
+        }
+        .connection-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 18px;
+            background: #ffffff;
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            margin-bottom: 12px;
+        }
+        .connection-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+        }
+        .connection-icon {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--brand);
+            color: #ffffff;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        .connection-icon.local {
+            background: #2563eb;
+        }
+        .connection-icon.google {
+            background: #db4437;
+        }
+        .connection-icon.github {
+            background: #111827;
+        }
+        .connection-details {
+            display: flex;
+            flex-direction: column;
+        }
+        .connection-name {
+            font-weight: 700;
+            color: var(--ink);
+        }
+        .connection-status {
+            font-size: 13px;
+            color: var(--muted);
+        }
+        .connection-status.connected {
+            color: #059669;
+        }
+        .connection-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            background: #059669;
+            color: #ffffff;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            margin-left: 8px;
+        }
+        .connection-actions {
+            display: flex;
+            gap: 8px;
+        }
+        .btn-small {
+            padding: 8px 14px;
+            font-size: 13px;
+            border-radius: 8px;
+            background: var(--brand);
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: filter 0.2s;
+        }
+        .btn-small:hover {
+            filter: brightness(1.04);
+        }
+        .btn-small.danger {
+            background: var(--danger);
+        }
+        .btn-small:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
         .message {
             padding: 12px 14px;
@@ -246,12 +334,12 @@
             display: none;
         }
         .message.success {
-            background: rgba(37, 99, 235, 0.12);
-            color: #1d4ed8;
+            background: #e9efff;
+            color: var(--brand);
             display: block;
         }
         .message.error {
-            background: rgba(180, 56, 52, 0.1);
+            background: #fee2e2;
             color: var(--danger);
             display: block;
         }
@@ -318,32 +406,52 @@
             </aside>
 
             <div class="profile-card">
-                <h2>Edit profile</h2>
-                <p class="profile-lead">Shape how you appear across meetings, chat, and collaboration views.</p>
-
                 <div id="message" class="message"></div>
 
-                <form onsubmit="saveProfile(event)">
-                    <div class="form-group">
-                        <label>Name</label>
-                        <input type="text" id="nameInput" required>
-                    </div>
+                <!-- Profile Editing Section -->
+                <div id="profileEditSection">
+                    <h2>Edit profile</h2>
+                    <p class="profile-lead">Shape how you appear across meetings, chat, and collaboration views.</p>
 
-                    <div class="form-group">
-                        <label>Bio</label>
-                        <textarea id="bioInput" placeholder="Tell us about yourself"></textarea>
-                    </div>
+                    <form onsubmit="saveProfile(event)">
+                        <div class="form-group">
+                            <label>Name</label>
+                            <input type="text" id="nameInput" required>
+                        </div>
 
-                    <div class="form-group">
-                        <label>Avatar URL (Optional)</label>
-                        <input type="url" id="avatarInput" placeholder="https://example.com/avatar.jpg">
+                        <div class="form-group">
+                            <label>Bio</label>
+                            <textarea id="bioInput" placeholder="Tell us about yourself"></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Avatar URL (Optional)</label>
+                            <input type="url" id="avatarInput" placeholder="https://example.com/avatar.jpg">
+                        </div>
+
+                        <div class="button-group">
+                            <button type="button" class="btn-cancel" onclick="goToDashboard()">Back</button>
+                            <button type="submit" class="btn-primary">Save Profile</button>
+                            <button type="button" class="btn-secondary" onclick="switchToConnections()">Manage Connections</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Account Connections Section -->
+                <div id="connectionsSection" style="display: none;">
+                    <h2>Connected Accounts</h2>
+                    <p class="profile-lead">Manage your login methods and connected social accounts.</p>
+
+                    <div id="connectionsList" style="margin: 24px 0;">
+                        <div style="text-align: center; padding: 40px; color: var(--muted);">
+                            Loading connections...
+                        </div>
                     </div>
 
                     <div class="button-group">
-                        <button type="button" class="btn-cancel" onclick="goToDashboard()">Back</button>
-                        <button type="submit" class="btn-primary">Save Changes</button>
+                        <button type="button" class="btn-cancel" onclick="switchToProfile()">Back to Profile</button>
                     </div>
-                </form>
+                </div>
             </div>
         </div>
     </div>
@@ -355,6 +463,7 @@
         }
 
         let currentUser = null;
+        const profileCacheKey = 'sup-user-profile-cache';
 
         function applyAvatar(el, name, avatarUrl) {
             if (!el) return;
@@ -369,7 +478,62 @@
             }
         }
 
+        function renderProfile(user) {
+            if (!user) return;
+            document.getElementById('userName').textContent = user.name || 'User';
+            document.getElementById('profileName').textContent = user.name || 'User';
+            document.getElementById('profileEmail').textContent = user.email || '';
+            applyAvatar(document.getElementById('profileAvatar'), user.name, user.avatar);
+            applyAvatar(document.getElementById('userAvatar'), user.name, user.avatar);
+
+            if (typeof user.name === 'string') {
+                document.getElementById('nameInput').value = user.name;
+            }
+            document.getElementById('bioInput').value = user.bio || '';
+            document.getElementById('avatarInput').value = user.avatar || '';
+        }
+
+        function loadCachedProfile() {
+            try {
+                const cachedRaw = localStorage.getItem(profileCacheKey);
+                if (!cachedRaw) return null;
+                const cached = JSON.parse(cachedRaw);
+                if (!cached || typeof cached !== 'object') return null;
+                return cached;
+            } catch (err) {
+                return null;
+            }
+        }
+
+        function saveCachedProfile(user) {
+            try {
+                localStorage.setItem(profileCacheKey, JSON.stringify({
+                    id: user.id,
+                    name: user.name,
+                    email: user.email,
+                    bio: user.bio || '',
+                    avatar: user.avatar || ''
+                }));
+            } catch (err) {
+                // Ignore localStorage errors.
+            }
+        }
+
         async function initProfile() {
+            // Check if coming from OAuth linking
+            const urlParams = new URLSearchParams(window.location.search);
+            const linkedProvider = urlParams.get('linked');
+
+            const cachedUser = loadCachedProfile();
+            if (cachedUser) {
+                renderProfile(cachedUser);
+            }
+            
+            if (linkedProvider) {
+                showMessage(`${linkedProvider.charAt(0).toUpperCase() + linkedProvider.slice(1)} account successfully linked!`, 'success');
+                window.history.replaceState({}, document.title, '/profile.html');
+            }
+
             await fetchUserProfile();
         }
 
@@ -380,16 +544,8 @@
                 });
                 const user = await response.json();
                 currentUser = user;
-
-                document.getElementById('userName').textContent = user.name;
-                document.getElementById('profileName').textContent = user.name;
-                document.getElementById('profileEmail').textContent = user.email;
-                applyAvatar(document.getElementById('profileAvatar'), user.name, user.avatar);
-                applyAvatar(document.getElementById('userAvatar'), user.name, user.avatar);
-
-                document.getElementById('nameInput').value = user.name;
-                document.getElementById('bioInput').value = user.bio || '';
-                document.getElementById('avatarInput').value = user.avatar || '';
+                renderProfile(user);
+                saveCachedProfile(user);
             } catch (err) {
                 console.error('Error fetching profile:', err);
             }
@@ -414,22 +570,174 @@
 
                 const updated = await response.json();
                 showMessage('Profile updated successfully!', 'success');
-                setTimeout(() => {
-                    window.location.href = '/dashboard.html';
-                }, 1500);
+                await fetchUserProfile();
             } catch (err) {
                 showMessage('Error updating profile: ' + err.message, 'error');
             }
+        }
+
+        async function loadConnections() {
+            try {
+                console.log('Starting loadConnections, token exists:', !!token);
+                const response = await fetch('/api/user/connections', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                console.log('Received response:', response.status, response.statusText);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('API Error Response:', response.status, errorText);
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log('Parsed API data:', data);
+                renderConnections(data.connections);
+            } catch (err) {
+                console.error('Error loading connections:', err);
+                document.getElementById('connectionsList').innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: var(--danger);">
+                        <p>Error loading connections: ${err.message}</p>
+                        <p style="font-size: 12px; margin-top: 10px; color: var(--muted);">
+                            Check browser console (F12) for debugging information.
+                        </p>
+                    </div>
+                `;
+                showMessage('Error loading connections', 'error');
+            }
+        }
+
+
+        function renderConnections(connections) {
+            console.log('Rendering connections:', connections);
+            const container = document.getElementById('connectionsList');
+            const providers = [
+                { id: 'local', name: 'Email & Password', iconClass: 'fa-solid fa-envelope' },
+                { id: 'google', name: 'Google', iconClass: 'fa-brands fa-google' },
+                { id: 'github', name: 'GitHub', iconClass: 'fa-brands fa-github' }
+            ];
+
+            let html = '';
+            providers.forEach(provider => {
+                const connected = connections[provider.id];
+                const isConnected = !!connected;
+                let statusText = 'Not connected';
+
+                if (isConnected) {
+                    if (provider.id === 'github' && (connected.githubUsername || connected.displayName)) {
+                        const rawGithubId = connected.githubUsername || connected.displayName;
+                        const normalizedGithubId = String(rawGithubId).replace(/^@/, '');
+                        const isHandle = /^[A-Za-z0-9-]+$/.test(normalizedGithubId);
+                        statusText = isHandle
+                            ? `Connected as @${normalizedGithubId}`
+                            : `Connected as ${rawGithubId}`;
+                    } else if (provider.id === 'google' && connected.email) {
+                        statusText = `Connected as ${connected.email}`;
+                    } else if (connected.displayName) {
+                        statusText = `Connected as ${connected.displayName}`;
+                    } else {
+                        statusText = 'Linked to your account';
+                    }
+                }
+
+                html += `
+                    <div class="connection-item">
+                        <div class="connection-info">
+                            <div class="connection-icon ${provider.id}"><i class="${provider.iconClass}" aria-hidden="true"></i></div>
+                            <div class="connection-details">
+                                <div class="connection-name">
+                                    ${provider.name}
+                                    ${isConnected ? '<span class="connection-badge">Connected</span>' : ''}
+                                </div>
+                                <div class="connection-status ${isConnected ? 'connected' : ''}">
+                                    ${statusText}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="connection-actions">
+                            ${isConnected ? `
+                                <button class="btn-small danger" onclick="unlinkProvider('${provider.id}')">
+                                    Unlink
+                                </button>
+                            ` : `
+                                <button class="btn-small" onclick="linkProvider('${provider.id}')">
+                                    Connect
+                                </button>
+                            `}
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        async function linkProvider(provider) {
+            try {
+                const response = await fetch(`/api/user/link-provider/${provider}`, {
+                    method: 'POST',
+                    headers: { 
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+                if (data.redirectUrl) {
+                    window.location.href = data.redirectUrl;
+                }
+            } catch (err) {
+                showMessage('Error connecting account: ' + err.message, 'error');
+            }
+        }
+
+        async function unlinkProvider(provider) {
+            if (!confirm(`Are you sure you want to unlink ${provider}? You'll only be able to sign in with other methods.`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/user/unlink-provider/${provider}`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    showMessage(`${provider} has been unlinked`, 'success');
+                    await loadConnections();
+                } else {
+                    showMessage(data.error || 'Error unlinking account', 'error');
+                }
+            } catch (err) {
+                showMessage('Error unlinking account: ' + err.message, 'error');
+            }
+        }
+
+        function switchToConnections() {
+            document.getElementById('profileEditSection').style.display = 'none';
+            document.getElementById('connectionsSection').style.display = 'block';
+            loadConnections();
+        }
+
+        function switchToProfile() {
+            document.getElementById('connectionsSection').style.display = 'none';
+            document.getElementById('profileEditSection').style.display = 'block';
         }
 
         function showMessage(text, type) {
             const messageDiv = document.getElementById('message');
             messageDiv.textContent = text;
             messageDiv.className = `message ${type}`;
+            setTimeout(() => {
+                messageDiv.className = 'message';
+            }, 4000);
         }
 
         function logout() {
             localStorage.removeItem('token');
+            localStorage.removeItem(profileCacheKey);
             window.location.href = '/';
         }
 

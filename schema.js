@@ -13,6 +13,9 @@ export const users = pgTable('users', {
     authProviderId: varchar('auth_provider_id', { length: 255 }),
     googleCalendarEmail: varchar('google_calendar_email', { length: 255 }),
     googleCalendarRefreshToken: text('google_calendar_refresh_token'),
+    emailVerified: boolean('email_verified').default(false),
+    emailVerificationToken: varchar('email_verification_token', { length: 255 }),
+    emailVerificationTokenExpires: timestamp('email_verification_token_expires'),
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow()
 });
@@ -31,6 +34,20 @@ export const meetings = pgTable('meetings', {
     updatedAt: timestamp('updated_at').defaultNow()
 });
 
+// User OAuth Connections - track multiple OAuth providers per user
+export const oauthConnections = pgTable('oauth_connections', {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    provider: varchar('provider', { length: 50 }).notNull(), // 'google', 'github'
+    providerId: varchar('provider_id', { length: 255 }).notNull(),
+    email: varchar('email', { length: 255 }),
+    displayName: varchar('display_name', { length: 255 }),
+    avatar: varchar('avatar', { length: 500 }),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow()
+});
+
+// User Two Factor
 export const userTwoFactor = pgTable('user_two_factor', {
     id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
     userId: integer('user_id').references(() => users.id, { onDelete: 'cascade' }),

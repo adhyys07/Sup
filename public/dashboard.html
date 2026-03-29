@@ -32,6 +32,7 @@
                 linear-gradient(180deg, #f8fbff 0%, #eef7ff 52%, #f4f8ff 100%);
             color: var(--ink);
             min-height: 100vh;
+            overflow-x: hidden;
         }
         .navbar {
             position: sticky;
@@ -237,7 +238,7 @@
         }
         .meetings-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
             gap: 18px;
         }
         .meeting-card {
@@ -314,6 +315,8 @@
             border-radius: 22px;
             max-width: 400px;
             width: 90%;
+            max-height: min(84vh, 680px);
+            overflow-y: auto;
             border: 1px solid rgba(255, 255, 255, 0.6);
             box-shadow: var(--shadow);
         }
@@ -369,8 +372,57 @@
             background: rgba(255, 255, 255, 0.42);
         }
         @media (max-width: 960px) {
+            .container {
+                margin-top: 24px;
+                padding: 0 16px;
+            }
             .welcome-section {
                 grid-template-columns: 1fr;
+            }
+            .hero-card h2 {
+                font-size: 34px;
+            }
+            .meetings-section {
+                padding: 22px;
+            }
+        }
+        @media (max-width: 760px) {
+            .navbar {
+                padding: 12px 14px;
+            }
+            .navbar-left {
+                gap: 12px;
+            }
+            h1 {
+                font-size: 24px;
+            }
+            nav a {
+                padding: 8px 10px;
+                font-size: 13px;
+            }
+            .user-name {
+                max-width: 96px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            .action-buttons {
+                display: grid;
+                grid-template-columns: 1fr;
+            }
+            .action-buttons button,
+            .integration-row button {
+                width: 100%;
+            }
+            .meetings-grid {
+                grid-template-columns: 1fr;
+            }
+            .card-buttons {
+                display: grid;
+                grid-template-columns: 1fr;
+            }
+            .card-buttons button {
+                width: 100%;
             }
         }
         @media (max-width: 680px) {
@@ -384,8 +436,74 @@
                 width: 100%;
                 justify-content: space-between;
             }
+            .navbar-right {
+                gap: 10px;
+            }
+            .user-info {
+                min-width: 0;
+            }
             .action-buttons button {
                 width: 100%;
+            }
+            .hero-card,
+            .metrics-card,
+            .meetings-section {
+                border-radius: 20px;
+            }
+            .hero-card {
+                padding: 22px;
+            }
+            .hero-card h2 {
+                font-size: 30px;
+            }
+            .modal-content {
+                width: calc(100% - 20px);
+                padding: 20px;
+                border-radius: 16px;
+            }
+        }
+        @media (max-width: 480px) {
+            .container {
+                margin-top: 18px;
+                padding: 0 10px;
+            }
+            .navbar {
+                padding: 10px;
+                gap: 10px;
+            }
+            h1 {
+                font-size: 20px;
+            }
+            nav {
+                gap: 6px;
+            }
+            nav a {
+                padding: 7px 9px;
+                font-size: 12px;
+            }
+            .avatar {
+                width: 36px;
+                height: 36px;
+            }
+            .btn-logout {
+                padding: 9px 12px;
+            }
+            .hero-card h2 {
+                font-size: 26px;
+            }
+            .hero-card p {
+                font-size: 14px;
+            }
+            .meeting-card {
+                padding: 16px;
+                border-radius: 16px;
+            }
+            .meeting-code {
+                font-size: 11px;
+                padding: 8px 10px;
+            }
+            .empty-state {
+                padding: 28px 16px;
             }
         }
     </style>
@@ -479,8 +597,8 @@
         <div class="modal-content">
             <h2>Join Meeting</h2>
             <div class="form-group">
-                <label>Meeting Code</label>
-                <input type="text" id="joinMeetingCode" placeholder="ABC123456" maxlength="9">
+                <label>Invite Link or Meeting Code</label>
+                <input type="text" id="joinMeetingCode" placeholder="https://your-app/join/ABC123456 or ABC123456">
             </div>
             <div class="modal-buttons">
                 <button class="btn-cancel" onclick="closeModal('joinMeetingModal')">Cancel</button>
@@ -497,6 +615,23 @@
 
         let currentUser = null;
         let userMeetings = [];
+        const profileCacheKey = 'sup-user-profile-cache';
+
+        function applyAvatar(el, name, avatarUrl) {
+            if (!el) return;
+            const initial = (name || 'U').charAt(0).toUpperCase();
+            el.textContent = initial;
+            el.style.backgroundImage = '';
+
+            if (avatarUrl) {
+                el.style.backgroundImage = `url('${avatarUrl.replace(/'/g, "%27")}')`;
+                el.style.backgroundSize = 'cover';
+                el.style.backgroundPosition = 'center';
+                el.style.color = 'transparent';
+            } else {
+                el.style.color = 'white';
+            }
+        }
 
         // Initialize dashboard
         async function initDashboard() {
@@ -515,7 +650,14 @@
 
                 document.getElementById('userName').textContent = user.name;
                 document.getElementById('welcomeName').textContent = user.name;
-                document.getElementById('userAvatar').textContent = user.name[0].toUpperCase();
+                applyAvatar(document.getElementById('userAvatar'), user.name, user.avatar);
+                localStorage.setItem(profileCacheKey, JSON.stringify({
+                    id: user.id,
+                    name: user.name,
+                    email: user.email,
+                    bio: user.bio || '',
+                    avatar: user.avatar || ''
+                }));
                 updateCalendarIntegrationUI();
             } catch (err) {
                 console.error('Error fetching profile:', err);
@@ -862,6 +1004,7 @@
 
         function logout() {
             localStorage.removeItem('token');
+            localStorage.removeItem(profileCacheKey);
             window.location.href = '/';
         }
 
