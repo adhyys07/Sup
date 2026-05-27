@@ -307,11 +307,14 @@
             }
         }
     </style>
+    <link rel="stylesheet" href="/design.css">
 </head>
-<body>
+<body class="sup-3d-page">
+    <div class="sup-3d-stage" aria-hidden="true"></div>
     <div class="page-shell">
         <section class="brand-panel">
             <div>
+                <div class="sup-scene-chip">3D team workspace</div>
                 <div class="brand-kicker">Focused collaboration</div>
                 <h2 class="brand-title">Meet, plan, and ship without context switching.</h2>
                 <p class="brand-copy">Sup brings calls, chat, private file sharing, and lightweight productivity tools into one calm workspace designed for fast teams.</p>
@@ -408,6 +411,7 @@
         </div>
     </div>
 
+    <script type="module" src="/scene3d.js"></script>
     <script>
         // Check if token exists
         const token = localStorage.getItem('token');

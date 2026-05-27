@@ -1,0 +1,297 @@
+:root {
+    --sup-ink: #08111f;
+    --sup-muted: #526070;
+    --sup-panel: rgba(255, 255, 255, 0.78);
+    --sup-panel-strong: rgba(255, 255, 255, 0.92);
+    --sup-line: rgba(8, 17, 31, 0.11);
+    --sup-blue: #1769e0;
+    --sup-cyan: #00a6a6;
+    --sup-amber: #d98a12;
+    --sup-red: #df3f46;
+    --sup-shadow: 0 22px 46px rgba(8, 17, 31, 0.16);
+}
+
+body.sup-3d-page {
+    color: var(--sup-ink);
+    background:
+        linear-gradient(130deg, rgba(246, 249, 252, 0.96), rgba(228, 238, 247, 0.88) 42%, rgba(244, 241, 232, 0.92));
+    isolation: isolate;
+}
+
+.sup-3d-stage {
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    overflow: hidden;
+    pointer-events: none;
+    background:
+        linear-gradient(115deg, rgba(255, 255, 255, 0.78), rgba(224, 237, 248, 0.42) 45%, rgba(241, 233, 215, 0.5));
+}
+
+.sup-3d-stage canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.sup-3d-page::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.25), rgba(255, 255, 255, 0.66)),
+        repeating-linear-gradient(90deg, rgba(8, 17, 31, 0.035) 0 1px, transparent 1px 68px),
+        repeating-linear-gradient(0deg, rgba(8, 17, 31, 0.025) 0 1px, transparent 1px 68px);
+    mask-image: linear-gradient(to bottom, #000, rgba(0, 0, 0, 0.4));
+}
+
+.page-shell,
+.container,
+.navbar,
+.hero-card,
+.metrics-card,
+.meetings-section,
+.profile-summary,
+.profile-card,
+.modal-content {
+    border-color: rgba(255, 255, 255, 0.72) !important;
+    background: var(--sup-panel) !important;
+    box-shadow: var(--sup-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.72) !important;
+    backdrop-filter: blur(18px) saturate(1.08);
+}
+
+.page-shell {
+    border-radius: 18px !important;
+    transform-style: preserve-3d;
+}
+
+.brand-panel {
+    overflow: hidden;
+    background:
+        linear-gradient(145deg, rgba(8, 17, 31, 0.95), rgba(20, 91, 118, 0.88) 58%, rgba(112, 81, 25, 0.82)) !important;
+}
+
+.brand-panel::before,
+.brand-panel::after {
+    display: none !important;
+}
+
+.brand-title,
+.hero-card h2,
+.profile-card h2 {
+    letter-spacing: 0 !important;
+}
+
+.brand-title {
+    max-width: 520px !important;
+}
+
+.feature-pill,
+.meeting-card,
+.metric,
+.summary-card,
+.connection-item,
+.tool-card {
+    border-radius: 8px !important;
+    border: 1px solid var(--sup-line) !important;
+    background: rgba(255, 255, 255, 0.64) !important;
+    box-shadow: 0 12px 26px rgba(8, 17, 31, 0.08);
+}
+
+.feature-pill {
+    color: rgba(255, 255, 255, 0.94);
+    background: rgba(255, 255, 255, 0.1) !important;
+    border-color: rgba(255, 255, 255, 0.18) !important;
+}
+
+.container,
+.hero-card,
+.metrics-card,
+.meetings-section,
+.profile-summary,
+.profile-card,
+.modal-content {
+    border-radius: 10px !important;
+}
+
+button,
+input,
+textarea,
+nav a,
+.meeting-code,
+.divider::before,
+.divider::after {
+    border-radius: 8px !important;
+}
+
+button {
+    box-shadow: 0 10px 18px rgba(8, 17, 31, 0.08);
+}
+
+.btn-primary,
+button:not(.btn-google):not(.btn-github):not(.btn-secondary):not(.btn-cancel):not(.btn-logout):not(.copy-btn):not(.chat-close) {
+    background: linear-gradient(135deg, var(--sup-blue), #095bbd) !important;
+}
+
+.btn-secondary,
+.btn-google {
+    background: rgba(255, 255, 255, 0.82) !important;
+    color: var(--sup-ink) !important;
+}
+
+.btn-logout,
+.btn-small.danger {
+    background: linear-gradient(135deg, var(--sup-red), #b92531) !important;
+}
+
+.avatar,
+.profile-avatar,
+.connection-icon {
+    background: linear-gradient(135deg, var(--sup-cyan), var(--sup-blue)) !important;
+    box-shadow: 0 14px 28px rgba(8, 17, 31, 0.18) !important;
+}
+
+.profile-avatar {
+    border-radius: 10px !important;
+}
+
+.navbar {
+    background: rgba(255, 255, 255, 0.7) !important;
+}
+
+.hero-card {
+    position: relative;
+    overflow: hidden;
+    min-height: 280px;
+    transform: perspective(900px) rotateX(0deg);
+}
+
+.hero-card::after,
+.profile-summary::after,
+.container::after {
+    content: "";
+    position: absolute;
+    inset: auto 18px 16px auto;
+    width: 116px;
+    height: 72px;
+    border: 1px solid rgba(8, 17, 31, 0.1);
+    transform: perspective(500px) rotateX(62deg) rotateZ(-24deg);
+    background:
+        linear-gradient(135deg, rgba(23, 105, 224, 0.22), rgba(0, 166, 166, 0.14)),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0));
+    box-shadow: 18px 22px 30px rgba(8, 17, 31, 0.16);
+    pointer-events: none;
+}
+
+.container {
+    position: relative;
+}
+
+.profile-summary {
+    position: relative;
+    overflow: hidden;
+}
+
+.metrics-card {
+    background: rgba(255, 255, 255, 0.68) !important;
+}
+
+.metric-value,
+h1 {
+    color: var(--sup-blue) !important;
+}
+
+.meeting-card {
+    transform-style: preserve-3d;
+}
+
+.meeting-card:hover,
+.summary-card:hover,
+.feature-pill:hover {
+    transform: translateY(-3px) rotateX(1.5deg);
+}
+
+.meeting-code {
+    background: rgba(23, 105, 224, 0.08) !important;
+    color: #17416f !important;
+}
+
+.section-head p,
+.hero-card p,
+.profile-lead,
+.subtitle,
+.metric-label,
+.summary-card span,
+.integration-status,
+.profile-email {
+    color: var(--sup-muted) !important;
+}
+
+.auth-shell {
+    background: rgba(255, 255, 255, 0.2) !important;
+}
+
+.auth-form h2 {
+    color: var(--sup-ink);
+}
+
+input,
+textarea {
+    background: rgba(255, 255, 255, 0.78) !important;
+    border-color: rgba(8, 17, 31, 0.12) !important;
+}
+
+input:focus,
+textarea:focus {
+    border-color: rgba(23, 105, 224, 0.5) !important;
+    box-shadow: 0 0 0 4px rgba(23, 105, 224, 0.12) !important;
+}
+
+.sup-scene-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    width: fit-content;
+    padding: 7px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.78);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.sup-scene-chip::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: var(--sup-amber);
+    box-shadow: 0 0 0 5px rgba(217, 138, 18, 0.14);
+}
+
+@media (max-width: 980px) {
+    .sup-3d-stage {
+        opacity: 0.58;
+    }
+
+    .page-shell {
+        min-height: auto !important;
+    }
+}
+
+@media (max-width: 640px) {
+    .sup-3d-page::before {
+        background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.78)),
+            repeating-linear-gradient(90deg, rgba(8, 17, 31, 0.03) 0 1px, transparent 1px 46px);
+    }
+
+    .hero-card::after,
+    .profile-summary::after,
+    .container::after {
+        display: none;
+    }
+}

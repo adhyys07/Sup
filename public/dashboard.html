@@ -507,8 +507,10 @@
             }
         }
     </style>
+    <link rel="stylesheet" href="/design.css">
 </head>
-<body>
+<body class="sup-3d-page">
+    <div class="sup-3d-stage" aria-hidden="true"></div>
     <div class="navbar">
         <div class="navbar-left">
             <h1>Sup!</h1>
@@ -607,6 +609,7 @@
         </div>
     </div>
 
+    <script type="module" src="/scene3d.js"></script>
     <script>
         const token = localStorage.getItem('token');
         if (!token) {
@@ -645,6 +648,9 @@
                 const response = await fetch('/api/user/profile', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
+                if (!response.ok) {
+                    throw new Error('Unable to load profile');
+                }
                 const user = await response.json();
                 currentUser = user;
 
