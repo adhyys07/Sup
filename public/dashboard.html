@@ -274,6 +274,72 @@
             font-size: 13px;
             margin-bottom: 12px;
         }
+        .history-list {
+            display: grid;
+            gap: 14px;
+        }
+        .history-card {
+            background: rgba(255, 255, 255, 0.68);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 18px;
+        }
+        .history-top {
+            display: flex;
+            justify-content: space-between;
+            gap: 14px;
+            align-items: start;
+            margin-bottom: 12px;
+        }
+        .history-title {
+            font-weight: 800;
+            color: var(--ink);
+            font-size: 17px;
+            margin-bottom: 4px;
+        }
+        .history-meta,
+        .audit-line {
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.45;
+        }
+        .history-stats {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 12px 0;
+        }
+        .history-chip {
+            padding: 7px 9px;
+            border-radius: 8px;
+            background: rgba(37, 99, 235, 0.08);
+            border: 1px solid rgba(37, 99, 235, 0.1);
+            color: #17416f;
+            font-size: 12px;
+            font-weight: 700;
+        }
+        .audit-list {
+            display: grid;
+            gap: 8px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--line);
+        }
+        .audit-line {
+            display: grid;
+            grid-template-columns: 112px 1fr;
+            gap: 10px;
+            align-items: baseline;
+        }
+        .audit-time {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 12px;
+            color: #64748b;
+        }
+        .audit-action {
+            color: var(--ink);
+            font-weight: 700;
+        }
         .card-buttons {
             display: flex;
             gap: 10px;
@@ -420,6 +486,11 @@
             .card-buttons {
                 display: grid;
                 grid-template-columns: 1fr;
+            }
+            .history-top,
+            .audit-line {
+                grid-template-columns: 1fr;
+                display: grid;
             }
             .card-buttons button {
                 width: 100%;
@@ -573,6 +644,18 @@
                 <div class="empty-state">Loading meetings...</div>
             </div>
         </div>
+
+        <div class="meetings-section" style="margin-top: 24px;">
+            <div class="section-head">
+                <div>
+                    <h2>Past Meeting Audit Logs</h2>
+                    <p>Duration, participation, recordings, messages, and key meeting events.</p>
+                </div>
+            </div>
+            <div class="history-list" id="meetingHistoryList">
+                <div class="empty-state">Loading audit logs...</div>
+            </div>
+        </div>
     </div>
 
     <!-- Create Meeting Modal -->
@@ -618,6 +701,7 @@
 
         let currentUser = null;
         let userMeetings = [];
+        let meetingHistory = [];
         const profileCacheKey = 'sup-user-profile-cache';
 
         function applyAvatar(el, name, avatarUrl) {
@@ -639,7 +723,7 @@
         // Initialize dashboard
         async function initDashboard() {
             await fetchUserProfile();
-            await fetchMeetings();
+            await Promise.all([fetchMeetings(), fetchMeetingHistory()]);
             handleCalendarCallbackStatus();
         }
 
@@ -679,6 +763,25 @@
                 renderMeetings();
             } catch (err) {
                 console.error('Error fetching meetings:', err);
+            }
+        }
+
+        async function fetchMeetingHistory() {
+            try {
+                const response = await fetch('/api/meetings/history', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!response.ok) {
+                    throw new Error('Failed to load meeting history');
+                }
+                meetingHistory = await response.json();
+                renderMeetingHistory();
+            } catch (err) {
+                console.error('Error fetching meeting history:', err);
+                const list = document.getElementById('meetingHistoryList');
+                if (list) {
+                    list.innerHTML = '<div class="empty-state">Could not load audit logs.</div>';
+                }
             }
         }
 
@@ -725,6 +828,68 @@
                                         + '</div>'
                                         + '</div>';
                         }).join('');
+        }
+
+        function renderMeetingHistory() {
+            const list = document.getElementById('meetingHistoryList');
+            const meetingCountEl = document.getElementById('statMeetingCount');
+            if (!list) return;
+
+            if (meetingCountEl && Array.isArray(meetingHistory)) {
+                meetingCountEl.textContent = String(Math.max(userMeetings.length, meetingHistory.length));
+            }
+
+            if (!Array.isArray(meetingHistory) || meetingHistory.length === 0) {
+                list.innerHTML = '<div class="empty-state">No past meeting activity yet.</div>';
+                return;
+            }
+
+            list.innerHTML = meetingHistory.map(function (meeting) {
+                const logs = Array.isArray(meeting.auditLogs) ? meeting.auditLogs.slice(0, 6) : [];
+                const started = meeting.startedAt ? formatLocalDateTime(meeting.startedAt) : 'Not started';
+                const ended = meeting.endedAt ? formatLocalDateTime(meeting.endedAt) : 'Active or not closed';
+                const duration = formatDuration(meeting.durationSeconds);
+                const participantTime = formatDuration(meeting.participantDurationSeconds);
+                const code = meeting.meetingCode || '';
+
+                return ''
+                    + '<article class="history-card">'
+                    + '<div class="history-top">'
+                    + '<div>'
+                    + '<div class="history-title">' + escapeHtml(meeting.title || 'Meeting') + '</div>'
+                    + '<div class="history-meta">Host: ' + escapeHtml(meeting.hostName || 'Unknown') + ' · Code: ' + escapeHtml(code) + '</div>'
+                    + '</div>'
+                    + '<button class="btn-secondary" onclick="joinMeetingByCode(\'' + escapeHtml(code) + '\')">Reopen</button>'
+                    + '</div>'
+                    + '<div class="history-meta">Started: ' + escapeHtml(started) + ' · Ended: ' + escapeHtml(ended) + '</div>'
+                    + '<div class="history-stats">'
+                    + '<span class="history-chip">Meeting: ' + escapeHtml(duration) + '</span>'
+                    + '<span class="history-chip">Participant time: ' + escapeHtml(participantTime) + '</span>'
+                    + '<span class="history-chip">' + Number(meeting.participantCount || 0) + ' participant' + (Number(meeting.participantCount || 0) === 1 ? '' : 's') + '</span>'
+                    + '<span class="history-chip">' + Number(meeting.recordingCount || 0) + ' recording' + (Number(meeting.recordingCount || 0) === 1 ? '' : 's') + '</span>'
+                    + '<span class="history-chip">' + Number(meeting.messageCount || 0) + ' message' + (Number(meeting.messageCount || 0) === 1 ? '' : 's') + '</span>'
+                    + '</div>'
+                    + renderAuditLines(logs)
+                    + '</article>';
+            }).join('');
+        }
+
+        function renderAuditLines(logs) {
+            if (!logs.length) {
+                return '<div class="audit-list"><div class="audit-line"><span class="audit-time">--</span><span>No audit events recorded yet.</span></div></div>';
+            }
+
+            return '<div class="audit-list">' + logs.map(function (log) {
+                const actor = log.actorName || 'System';
+                const action = formatAuditAction(log.action);
+                const duration = log.durationSeconds ? ' · ' + formatDuration(log.durationSeconds) : '';
+                const detail = formatAuditDetails(log.details);
+                return ''
+                    + '<div class="audit-line">'
+                    + '<span class="audit-time">' + escapeHtml(formatShortDateTime(log.occurredAt)) + '</span>'
+                    + '<span><span class="audit-action">' + escapeHtml(action) + '</span> by ' + escapeHtml(actor) + duration + (detail ? ' · ' + escapeHtml(detail) : '') + '</span>'
+                    + '</div>';
+            }).join('') + '</div>';
         }
 
         async function createMeeting() {
@@ -832,6 +997,58 @@
                 hour: '2-digit',
                 minute: '2-digit'
             });
+        }
+
+        function formatShortDateTime(value) {
+            if (!value) return '--';
+            const d = new Date(value);
+            return d.toLocaleString([], {
+                month: 'short',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function formatDuration(totalSeconds) {
+            const seconds = Number(totalSeconds || 0);
+            if (!Number.isFinite(seconds) || seconds <= 0) return '0m';
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const remainingSeconds = Math.floor(seconds % 60);
+
+            if (hours > 0) return hours + 'h ' + minutes + 'm';
+            if (minutes > 0) return minutes + 'm ' + remainingSeconds + 's';
+            return remainingSeconds + 's';
+        }
+
+        function formatAuditAction(action) {
+            const labels = {
+                meeting_created: 'Meeting created',
+                meeting_scheduled: 'Meeting scheduled',
+                meeting_started: 'Meeting started',
+                meeting_ended: 'Meeting ended',
+                participant_registered: 'Participant registered',
+                participant_joined: 'Participant joined',
+                participant_left: 'Participant left',
+                recording_started: 'Recording started',
+                recording_saved: 'Recording saved'
+            };
+            return labels[action] || String(action || 'Activity').replace(/_/g, ' ');
+        }
+
+        function formatAuditDetails(details) {
+            if (!details) return '';
+            if (typeof details === 'string') return details;
+            if (details.reason) return 'Reason: ' + details.reason;
+            if (details.source) return 'Source: ' + details.source;
+            if (details.googleDriveUploaded || details.githubUploaded) {
+                const targets = [];
+                if (details.googleDriveUploaded) targets.push('Google Drive');
+                if (details.githubUploaded) targets.push('GitHub');
+                return 'Saved to ' + targets.join(' and ');
+            }
+            return '';
         }
 
         function getMeetingByCode(code) {

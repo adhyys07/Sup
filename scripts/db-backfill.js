@@ -24,10 +24,28 @@ const sqlStatements = [
         email varchar(255),
         display_name varchar(255),
         avatar varchar(500),
+        github_access_token text,
         created_at timestamp DEFAULT now(),
         updated_at timestamp DEFAULT now()
     );`,
+    'ALTER TABLE oauth_connections ADD COLUMN IF NOT EXISTS github_access_token text;',
     'CREATE UNIQUE INDEX IF NOT EXISTS oauth_connections_user_provider_uq ON oauth_connections(user_id, provider);',
+    `CREATE TABLE IF NOT EXISTS meeting_audit_logs (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        meeting_id integer REFERENCES meetings(id) ON DELETE CASCADE,
+        meeting_code varchar(50) NOT NULL,
+        user_id integer REFERENCES users(id) ON DELETE SET NULL,
+        actor_name varchar(255),
+        action varchar(80) NOT NULL,
+        details text,
+        duration_seconds integer,
+        occurred_at timestamp DEFAULT now(),
+        created_at timestamp DEFAULT now()
+    );`,
+    'CREATE INDEX IF NOT EXISTS meeting_audit_logs_meeting_idx ON meeting_audit_logs(meeting_id);',
+    'CREATE INDEX IF NOT EXISTS meeting_audit_logs_code_idx ON meeting_audit_logs(meeting_code);',
+    'CREATE INDEX IF NOT EXISTS meeting_audit_logs_user_idx ON meeting_audit_logs(user_id);',
+    'CREATE INDEX IF NOT EXISTS meeting_audit_logs_occurred_at_idx ON meeting_audit_logs(occurred_at);',
     `INSERT INTO oauth_connections (user_id, provider, provider_id, email, display_name, avatar, created_at, updated_at)
      SELECT
         id,

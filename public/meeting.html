@@ -978,6 +978,554 @@
                 height: 320px;
             }
         }
+
+        /* Meeting room polish */
+        :root {
+            --room-bg: #0b1018;
+            --room-ink: #f4f8fb;
+            --room-muted: #aeb8c7;
+            --room-panel: rgba(14, 20, 31, 0.82);
+            --room-panel-strong: rgba(10, 15, 24, 0.94);
+            --room-panel-soft: rgba(255, 255, 255, 0.07);
+            --room-line: rgba(222, 232, 242, 0.14);
+            --room-blue: #5b7cfa;
+            --room-cyan: #21b8a6;
+            --room-amber: #c98a2d;
+            --room-danger: #e14d5a;
+            --room-shadow: 0 24px 54px rgba(0, 0, 0, 0.38);
+        }
+
+        body {
+            background:
+                radial-gradient(circle at 14% 18%, rgba(33, 184, 166, 0.18), transparent 28%),
+                radial-gradient(circle at 84% 16%, rgba(91, 124, 250, 0.18), transparent 26%),
+                radial-gradient(circle at 76% 86%, rgba(201, 138, 45, 0.14), transparent 26%),
+                linear-gradient(135deg, #0b1018 0%, #111827 48%, #17151f 100%);
+            color: var(--room-ink);
+        }
+
+        body::after {
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
+            background-size: 56px 56px;
+            opacity: 0.55;
+        }
+
+        .header,
+        .video-section,
+        .chat-section,
+        .tools-section,
+        .call-controls,
+        .lobby-card {
+            background: var(--room-panel);
+            border: 1px solid var(--room-line);
+            box-shadow: var(--room-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(18px) saturate(1.05);
+        }
+
+        .header {
+            height: 62px;
+            padding: 0 18px;
+            border-width: 0 0 1px;
+            background: rgba(10, 15, 24, 0.9);
+        }
+
+        .header-left,
+        .header-right {
+            min-width: 0;
+        }
+
+        .header-left h1 {
+            color: #ffffff;
+            font-size: 15px;
+            letter-spacing: 0;
+            text-transform: none;
+        }
+
+        .meeting-code {
+            max-width: 34vw;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            background: rgba(255, 255, 255, 0.075);
+            border-color: rgba(255, 255, 255, 0.13);
+            color: #e6edf7;
+            border-radius: 8px;
+        }
+
+        .copy-btn,
+        .btn-toggle,
+        .btn-back,
+        .btn-join-now,
+        .tool-btn,
+        .timer-row button,
+        .chat-input button {
+            border-radius: 8px;
+            transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease;
+        }
+
+        .copy-btn:hover,
+        .btn-toggle:hover,
+        .btn-back:hover,
+        .tool-btn:hover,
+        .timer-row button:hover,
+        .chat-input button:hover {
+            transform: translateY(-1px);
+            border-color: rgba(255, 255, 255, 0.28);
+        }
+
+        .btn-toggle.active,
+        .ctrl-on,
+        .tool-btn,
+        .timer-row button,
+        .chat-input button,
+        .btn-join-now {
+            background: linear-gradient(135deg, var(--room-cyan), #2786d8) !important;
+            color: #ffffff;
+            border-color: rgba(191, 219, 254, 0.32);
+        }
+
+        .btn-leave,
+        .ctrl-off {
+            background: linear-gradient(135deg, var(--room-danger), #b73542) !important;
+            color: #ffffff;
+            border-color: rgba(254, 202, 202, 0.4);
+        }
+
+        .main-content {
+            padding: 14px;
+            gap: 14px;
+            position: relative;
+        }
+
+        .video-section,
+        .chat-section,
+        .tools-section {
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .videos-container {
+            padding: 12px;
+            gap: 12px;
+        }
+
+        .video-wrapper {
+            border-radius: 8px;
+            background:
+                linear-gradient(145deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.025)),
+                radial-gradient(circle at 24% 20%, rgba(33, 184, 166, 0.14), transparent 34%),
+                radial-gradient(circle at 78% 74%, rgba(91, 124, 250, 0.13), transparent 38%),
+                #101824;
+            border-color: rgba(222, 232, 242, 0.13);
+            box-shadow: 0 18px 34px rgba(0, 0, 0, 0.28);
+        }
+
+        .video-wrapper video:not(#localCamPip) {
+            object-fit: cover;
+        }
+
+        #localCamPip {
+            border-radius: 8px;
+            border-color: rgba(217, 138, 18, 0.72);
+            box-shadow: 0 16px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .video-label,
+        .camera-avatar,
+        .camera-off {
+            border-radius: 8px;
+        }
+
+        .video-label {
+            bottom: 12px;
+            left: 12px;
+            background: rgba(7, 19, 34, 0.76);
+            border-color: rgba(255, 255, 255, 0.16);
+            color: #ffffff;
+        }
+
+        .camera-off {
+            isolation: isolate;
+            overflow: hidden;
+            background:
+                radial-gradient(circle at 50% 35%, rgba(255, 255, 255, 0.12), transparent 18%),
+                radial-gradient(circle at 20% 18%, rgba(33, 184, 166, 0.18), transparent 32%),
+                radial-gradient(circle at 82% 78%, rgba(91, 124, 250, 0.18), transparent 36%),
+                linear-gradient(145deg, #141d2b 0%, #182335 52%, #101824 100%) !important;
+        }
+
+        .camera-off::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            z-index: -1;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+            background-size: 64px 64px;
+            mask-image: radial-gradient(circle at center, rgba(0, 0, 0, 0.84), transparent 72%);
+        }
+
+        .camera-off::after {
+            content: "";
+            position: absolute;
+            width: min(420px, 42%);
+            aspect-ratio: 1;
+            border-radius: 50%;
+            background: linear-gradient(135deg, rgba(33, 184, 166, 0.22), rgba(91, 124, 250, 0.18));
+            filter: blur(4px);
+            opacity: 0.72;
+            transform: translateY(8px);
+            z-index: -1;
+        }
+
+        .camera-avatar {
+            width: 108px;
+            height: 108px;
+            border-radius: 18px;
+            background: linear-gradient(135deg, var(--avatar-start, var(--room-cyan)), var(--avatar-end, var(--room-blue)));
+            border: 1px solid rgba(255, 255, 255, 0.22);
+            box-shadow: 0 18px 34px rgba(0, 0, 0, 0.26);
+            font-size: 34px;
+        }
+
+        .camera-name {
+            color: #eef4fb;
+            text-shadow: 0 1px 10px rgba(0, 0, 0, 0.26);
+        }
+
+        .chat-section.active,
+        .tools-section.active {
+            width: 356px;
+        }
+
+        .chat-header,
+        .tools-header {
+            min-height: 52px;
+            padding: 14px 16px;
+            color: #f8fbff;
+            letter-spacing: 0;
+            text-transform: none;
+        }
+
+        .chat-messages,
+        .tools-content {
+            padding: 14px;
+        }
+
+        .chat-message,
+        .tool-card,
+        .check-item,
+        .transcript-box {
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.075);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
+        .tool-title {
+            color: #dbeafe;
+            letter-spacing: 0;
+            text-transform: none;
+            font-size: 13px;
+        }
+
+        .tool-muted,
+        .message-time,
+        .attachment-meta {
+            color: var(--room-muted);
+        }
+
+        .tool-input,
+        .tool-textarea,
+        .chat-input input {
+            border-radius: 8px;
+            background: rgba(3, 10, 24, 0.5);
+            border-color: rgba(255, 255, 255, 0.14);
+            color: #f8fbff;
+        }
+
+        .chat-input {
+            padding: 12px;
+            gap: 8px;
+            border-top-color: rgba(255, 255, 255, 0.12);
+        }
+
+        .call-controls {
+            width: min(760px, calc(100% - 28px));
+            height: 72px;
+            margin-bottom: 12px;
+            gap: 10px;
+            border-radius: 12px;
+            background: rgba(7, 19, 34, 0.86);
+        }
+
+        .call-controls button,
+        .lobby-controls button {
+            width: 46px;
+            height: 46px;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.22);
+        }
+
+        .call-controls button:hover,
+        .lobby-controls button:hover {
+            transform: translateY(-2px);
+        }
+
+        .call-controls button:disabled {
+            opacity: 0.58;
+            cursor: wait;
+            transform: none;
+        }
+
+        .lobby-overlay {
+            padding: 20px;
+            background:
+                linear-gradient(135deg, rgba(7, 19, 34, 0.9), rgba(4, 12, 24, 0.96)),
+                radial-gradient(circle at 18% 22%, rgba(0, 166, 166, 0.24), transparent 28%),
+                radial-gradient(circle at 82% 16%, rgba(23, 105, 224, 0.22), transparent 26%),
+                radial-gradient(circle at 72% 86%, rgba(217, 138, 18, 0.16), transparent 22%);
+        }
+
+        .lobby-overlay::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+            background-size: 58px 58px;
+            mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.84), rgba(0, 0, 0, 0.2));
+        }
+
+        .lobby-card {
+            position: relative;
+            width: min(520px, 100%);
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+            gap: 16px;
+            padding: 22px;
+            border-radius: 12px;
+            background: linear-gradient(160deg, rgba(11, 22, 38, 0.9), rgba(10, 35, 48, 0.84));
+        }
+
+        .lobby-card::after {
+            content: "";
+            position: absolute;
+            right: 20px;
+            bottom: 18px;
+            width: 112px;
+            height: 66px;
+            border-radius: 4px;
+            pointer-events: none;
+            transform: perspective(520px) rotateX(64deg) rotateZ(-22deg);
+            background: linear-gradient(135deg, rgba(23, 105, 224, 0.28), rgba(0, 166, 166, 0.16));
+            border: 1px solid rgba(191, 219, 254, 0.24);
+            box-shadow: 18px 22px 32px rgba(0, 0, 0, 0.28);
+        }
+
+        .lobby-card h2 {
+            align-self: flex-start;
+            color: #ffffff;
+            font-size: 24px;
+            line-height: 1.1;
+            letter-spacing: 0;
+        }
+
+        .lobby-preview {
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            background:
+                linear-gradient(135deg, rgba(0, 166, 166, 0.14), rgba(23, 105, 224, 0.12)),
+                #050b14;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+
+        .lobby-preview video {
+            object-fit: cover;
+        }
+
+        .lobby-preview .cam-off-placeholder {
+            color: #ffffff;
+            background:
+                linear-gradient(135deg, rgba(0, 166, 166, 0.2), rgba(23, 105, 224, 0.18)),
+                rgba(5, 11, 20, 0.92);
+        }
+
+        .lobby-controls {
+            gap: 10px;
+        }
+
+        .lobby-info,
+        .waiting-state {
+            width: 100%;
+            justify-content: center;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.075);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #dbeafe;
+            padding: 10px 12px;
+        }
+
+        .lobby-info .dot {
+            background: var(--room-cyan);
+            box-shadow: 0 0 0 5px rgba(0, 166, 166, 0.18);
+        }
+
+        .btn-join-now,
+        .btn-back {
+            width: 100%;
+            min-height: 44px;
+            font-size: 14px;
+            font-weight: 800;
+        }
+
+        .btn-back {
+            color: #eaf2ff;
+            background: rgba(255, 255, 255, 0.075);
+            border-color: rgba(255, 255, 255, 0.14);
+        }
+
+        body.light-mode {
+            background:
+                radial-gradient(circle at 12% 18%, rgba(0, 166, 166, 0.14), transparent 28%),
+                radial-gradient(circle at 84% 18%, rgba(91, 124, 250, 0.12), transparent 24%),
+                linear-gradient(135deg, #f8fbff, #e8f0f7 48%, #f5f0e6);
+            color: #08111f;
+        }
+
+        body.light-mode .header,
+        body.light-mode .video-section,
+        body.light-mode .chat-section,
+        body.light-mode .tools-section,
+        body.light-mode .call-controls {
+            background: rgba(255, 255, 255, 0.88);
+            border-color: rgba(8, 17, 31, 0.12);
+            color: #08111f;
+            box-shadow: 0 20px 42px rgba(8, 17, 31, 0.12);
+        }
+
+        body.light-mode .header-left h1,
+        body.light-mode .chat-header,
+        body.light-mode .tools-header,
+        body.light-mode .tool-title {
+            color: #08111f;
+        }
+
+        body.light-mode .copy-btn,
+        body.light-mode .btn-toggle,
+        body.light-mode .btn-back,
+        body.light-mode .meeting-code,
+        body.light-mode .chat-message,
+        body.light-mode .tool-card,
+        body.light-mode .check-item,
+        body.light-mode .transcript-box,
+        body.light-mode .lobby-info,
+        body.light-mode .waiting-state {
+            background: rgba(255, 255, 255, 0.86);
+            border-color: rgba(8, 17, 31, 0.12);
+            color: #08111f;
+        }
+
+        body.light-mode .tool-input,
+        body.light-mode .tool-textarea,
+        body.light-mode .chat-input input {
+            background: rgba(255, 255, 255, 0.92);
+            color: #08111f;
+            border-color: rgba(8, 17, 31, 0.14);
+        }
+
+        @media (max-width: 760px) {
+            .header {
+                height: auto;
+                min-height: 58px;
+                padding: 10px 12px;
+                gap: 10px;
+                flex-wrap: wrap;
+            }
+
+            .header-left,
+            .header-right {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .header-right {
+                gap: 8px;
+            }
+
+            .header-right .btn-toggle {
+                flex: 1;
+                padding: 9px 10px;
+            }
+
+            .btn-leave {
+                padding: 9px 14px;
+            }
+
+            .main-content {
+                padding: 8px;
+                gap: 8px;
+            }
+
+            .chat-section,
+            .tools-section {
+                top: 102px;
+                bottom: 78px;
+                border-radius: 0;
+            }
+
+            .call-controls {
+                width: calc(100% - 16px);
+                height: auto;
+                min-height: 70px;
+                display: grid;
+                grid-template-columns: repeat(5, 44px);
+                justify-content: center;
+                align-content: center;
+                gap: 8px;
+                padding: 9px;
+            }
+
+            .call-controls button,
+            .lobby-controls button {
+                width: 42px;
+                height: 42px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .lobby-overlay {
+                padding: 12px;
+            }
+
+            .lobby-card {
+                padding: 18px;
+                gap: 14px;
+            }
+
+            .lobby-card h2 {
+                font-size: 22px;
+            }
+
+            .lobby-card::after {
+                display: none;
+            }
+
+            .meeting-code {
+                max-width: 180px;
+            }
+
+            .call-controls {
+                grid-template-columns: repeat(4, 42px);
+            }
+        }
     </style>
 </head>
 <body>
@@ -1152,6 +1700,7 @@
         <button id="raiseHandBtn" class="ctrl-on" onclick="toggleRaiseHand()" title="Raise hand">✋</button>
         <button id="lockChatBtn" class="ctrl-on" onclick="toggleRoomChat()" title="Lock chat" style="display:none"></button>
         <button id="presentbtn" class="ctrl-on" onclick="togglePresent()" title="Toggle presentation"></button>
+        <button id="saveDriveBtn" class="btn-toggle" onclick="toggleDriveSave()" title="Save recordings to Google Drive"></button>
         <button id="recordBtn" class="ctrl-on" onclick="toggleRecording()" title="Record meeting">⏺</button>
         <button id="leaveBtn" class="ctrl-on" onclick="leaveMeeting()" title="Leave meeting"></button>
     </div>
@@ -1205,11 +1754,13 @@
         let isWaitingForApproval = false;
         let mediaRecorder = null;
         let recordingChunks = [];
+        let recordingStartedAt = 0;
         let transcriptionEngine = null;
         let transcriptionRunning = false;
         let activePoll = null;
         let breakoutRooms = [];
         let whiteboardStrokeId = 0;
+        let saveToGoogleDrive = localStorage.getItem('sup-save-google-drive') === '1';
 
         // E2EE state
         let e2eeRoomKey = null;
@@ -1243,6 +1794,7 @@
                 attachment: `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.44 11.05 12.25 20.24a6 6 0 1 1-8.49-8.49l9.2-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.82-2.82l8.48-8.49"></path></svg>`,
                 chat: `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10h10"></path><path d="M7 14h6"></path><path d="M21 12a8 8 0 0 1-8 8H5l-2 2V12a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8Z"></path></svg>`,
                 chatOff: `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8 8 0 0 1-8 8H5l-2 2V12a8 8 0 0 1 8-8h2"></path><path d="M4 4l16 16"></path></svg>`,
+                drive: `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h7l6 10h-7Z"></path><path d="M3 14h7l3.5 6H6.5Z"></path><path d="M10 14h7l-3.5 6h-7Z"></path></svg>`,
                 remove: `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"></path><path d="M6 6l12 12"></path></svg>`
             };
             return icons[name] || '';
@@ -1269,8 +1821,34 @@
             setIconButton('callCamBtn', 'camera', 'Toggle camera');
             setIconButton('lockChatBtn', 'lock', 'Lock chat');
             setIconButton('presentbtn', 'present', 'Present screen');
+            setIconButton('saveDriveBtn', 'drive', 'Save recordings to Google Drive');
             setIconButton('leaveBtn', 'leave', 'Leave meeting');
+            updateDriveSaveButton();
             updateThemeLabel();
+        }
+
+        function updateDriveSaveButton() {
+            const btn = document.getElementById('saveDriveBtn');
+            if (!btn) return;
+
+            if (saveToGoogleDrive) {
+                btn.className = 'ctrl-on';
+                btn.title = 'Google Drive save is ON';
+                btn.setAttribute('aria-label', 'Google Drive save is ON');
+            } else {
+                btn.className = 'btn-toggle';
+                btn.title = 'Google Drive save is OFF';
+                btn.setAttribute('aria-label', 'Google Drive save is OFF');
+            }
+        }
+
+        function toggleDriveSave() {
+            saveToGoogleDrive = !saveToGoogleDrive;
+            localStorage.setItem('sup-save-google-drive', saveToGoogleDrive ? '1' : '0');
+            updateDriveSaveButton();
+            showHostNotification(saveToGoogleDrive
+                ? 'Google Drive save enabled for recordings'
+                : 'Google Drive save disabled for recordings');
         }
 
         function updateThemeLabel() {
@@ -1332,11 +1910,11 @@
 
         function themeFromName(name) {
             const themes = [
-                ['#0f2027', '#2c5364'],
-                ['#42275a', '#734b6d'],
-                ['#134e5e', '#71b280'],
-                ['#1f4037', '#99f2c8'],
-                ['#373b44', '#4286f4']
+                ['#21b8a6', '#5b7cfa'],
+                ['#8b6fdb', '#d16b86'],
+                ['#2aa885', '#c98a2d'],
+                ['#4f8fd8', '#6f7f95'],
+                ['#b0763d', '#5b7cfa']
             ];
             let hash = 0;
             const value = name || 'User';
@@ -1571,8 +2149,12 @@
             }
 
             const [startColor, endColor] = themeFromName(userName);
-            placeholder.style.background = `linear-gradient(135deg, ${startColor}, ${endColor})`;
-            placeholder.querySelector('.camera-avatar').textContent = getInitials(userName);
+            placeholder.style.setProperty('--avatar-start', startColor);
+            placeholder.style.setProperty('--avatar-end', endColor);
+            const avatar = placeholder.querySelector('.camera-avatar');
+            avatar.style.setProperty('--avatar-start', startColor);
+            avatar.style.setProperty('--avatar-end', endColor);
+            avatar.textContent = getInitials(userName);
             placeholder.querySelector('.camera-name').textContent = userName || 'User';
             placeholder.classList.toggle('active', !!isOff);
 
@@ -1585,7 +2167,7 @@
         async function initLobby() {
             try {
                 currentUser = await getCurrentUser();
-                userNames['local'] = currentUser.name;
+                userNames['local'] = currentUser?.name || 'You';
 
                 // Get camera preview for lobby
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
@@ -1598,9 +2180,10 @@
                         headers: { 'Authorization': `Bearer ${token}` }
                     });
                     const data = await res.json();
-                    const text = data.count === 0
+                    const participantCount = Number(data.count || 0);
+                    const text = participantCount === 0
                         ? 'No one else is here yet'
-                        : `${data.count} person${data.count > 1 ? 's' : ''} in this meeting`;
+                        : `${participantCount} person${participantCount > 1 ? 's' : ''} in this meeting`;
                     document.getElementById('lobbyParticipantText').textContent = text;
                 } catch {
                     document.getElementById('lobbyParticipantText').textContent = 'Ready to connect';
@@ -1717,11 +2300,13 @@
                 syncLocalCamPip();
 
                 // Update local video label with real name
-                document.getElementById('localVideoLabel').textContent = currentUser.name + ' (You)';
-                setTileCameraState('tile-local', currentUser.name + ' (You)', !camEnabled);
+                const localDisplayName = currentUser?.name || 'You';
+                const localTileName = localDisplayName === 'You' ? 'You' : localDisplayName + ' (You)';
+                document.getElementById('localVideoLabel').textContent = localTileName;
+                setTileCameraState('tile-local', localTileName, !camEnabled);
 
                 // Join socket room
-                socket.emit('join-room', room, currentUser.id, currentUser.name, async ({ isHost: hostFlag } = {}) => {
+                socket.emit('join-room', room, currentUser?.id, localDisplayName, async ({ isHost: hostFlag } = {}) => {
                     isHost = !!hostFlag;
                     if (hostFlag) {
                         document.getElementById('lockChatBtn').style.display = '';
@@ -2827,7 +3412,13 @@
                 mediaRecorder.stop();
                 btn.className = 'ctrl-on';
                 btn.textContent = '⏺';
-                showHostNotification('Recording stopped');
+                btn.disabled = true;
+                showHostNotification('Saving recording...');
+                return;
+            }
+
+            if (!isHost) {
+                showHostNotification('Only host can record meetings');
                 return;
             }
 
@@ -2836,33 +3427,81 @@
                 return;
             }
 
-            try {
-                mediaRecorder = new MediaRecorder(localStream, { mimeType: 'video/webm;codecs=vp8,opus' });
+            (async () => {
+                try {
+                    const preferredMimeType = 'video/webm;codecs=vp8,opus';
+                    const fallbackMimeType = 'video/webm';
+                    const selectedMimeType = MediaRecorder.isTypeSupported(preferredMimeType)
+                        ? preferredMimeType
+                        : fallbackMimeType;
+
+                    mediaRecorder = new MediaRecorder(localStream, { mimeType: selectedMimeType });
                 recordingChunks = [];
+                    recordingStartedAt = Date.now();
 
                 mediaRecorder.ondataavailable = (event) => {
                     if (event.data && event.data.size > 0) recordingChunks.push(event.data);
                 };
 
-                mediaRecorder.onstop = () => {
+                    mediaRecorder.onstop = async () => {
                     const blob = new Blob(recordingChunks, { type: 'video/webm' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `meeting-${room}-${Date.now()}.webm`;
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
-                    URL.revokeObjectURL(url);
+                        const durationMs = Math.max(0, Date.now() - recordingStartedAt);
+                        const formData = new FormData();
+                        formData.append('file', blob, `meeting-${room}-${Date.now()}.webm`);
+                        formData.append('durationMs', String(durationMs));
+                        formData.append('saveToGoogleDrive', saveToGoogleDrive ? '1' : '0');
+
+                        try {
+                            const stopResponse = await fetch(`/api/meetings/${room}/recordings/stop`, {
+                                method: 'POST',
+                                headers: { 'Authorization': `Bearer ${token}` },
+                                body: formData
+                            });
+
+                            const payload = await stopResponse.json().catch(() => null);
+                            if (!stopResponse.ok) {
+                                throw new Error(payload?.error || 'Failed to save recording');
+                            }
+
+                            const driveUploaded = payload?.googleDriveSync?.uploaded;
+                            const githubUploaded = payload?.githubSync?.uploaded;
+                            if (driveUploaded && githubUploaded) {
+                                showHostNotification('Recording saved to server, Google Drive, and GitHub');
+                            } else if (driveUploaded) {
+                                showHostNotification('Recording saved to server and Google Drive');
+                            } else if (saveToGoogleDrive && payload?.googleDriveSync?.reason !== 'disabled') {
+                                showHostNotification('Recording saved, but Google Drive sync failed');
+                            } else {
+                                showHostNotification('Recording saved');
+                            }
+                        } catch (err) {
+                            console.error('Recording upload failed:', err);
+                            showHostNotification(err.message || 'Failed to save recording');
+                        } finally {
+                            btn.disabled = false;
+                            recordingChunks = [];
+                            recordingStartedAt = 0;
+                        }
                 };
+
+                    const startResponse = await fetch(`/api/meetings/${room}/recordings/start`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (!startResponse.ok) {
+                        const payload = await startResponse.json().catch(() => null);
+                        throw new Error(payload?.error || 'Unable to start meeting recording');
+                    }
 
                 mediaRecorder.start(1000);
                 btn.className = 'ctrl-off';
                 btn.textContent = '■';
                 showHostNotification('Recording started');
-            } catch {
-                showHostNotification('Recording is not supported in this browser');
-            }
+                } catch (err) {
+                    console.error('Recording start error:', err);
+                    showHostNotification(err.message || 'Recording is not supported in this browser');
+                }
+            })();
         }
 
         function initWhiteboard() {

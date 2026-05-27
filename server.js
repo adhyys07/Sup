@@ -15,8 +15,8 @@ import { Strategy as GitHubStrategy } from 'passport-github2';
 import nodemailer from 'nodemailer';
 import 'dotenv/config';
 import { db } from './db.js';
-import { users, meetings, meetingParticipants, messages, userTwoFactor, meetingReactions, raisedHands, meetingWaitingRoom, oauthConnections } from './schema.js';
-import { eq, or, and, inArray, sql } from 'drizzle-orm';
+import { users, meetings, meetingParticipants, messages, recordings, meetingAuditLogs, userTwoFactor, meetingReactions, raisedHands, meetingWaitingRoom, oauthConnections } from './schema.js';
+import { eq, or, and, inArray, sql, desc } from 'drizzle-orm';
 import speakeasy from 'speakeasy';
 import ratelimit from 'express-rate-limit';
 import { timestamp } from 'drizzle-orm/mysql-core';
@@ -38,8 +38,12 @@ const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this';
 const GOOGLE_CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+const GITHUB_OAUTH_SCOPES = ['user:email', 'repo'];
 const TEMP_ATTACHMENTS_DIR = path.join(process.cwd(), 'temp', 'meeting-attachments');
+const MEETING_RECORDINGS_DIR = path.join(process.cwd(), 'storage', 'meeting-recordings');
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+const MAX_RECORDING_BYTES = 300 * 1024 * 1024;
 
 // Email configuration (using Gmail or custom SMTP)
 const emailTransporter = nodemailer.createTransport({
@@ -62,6 +66,7 @@ if (process.env.EMAIL_USER) {
 }
 
 fs.mkdirSync(TEMP_ATTACHMENTS_DIR, { recursive: true });
+fs.mkdirSync(MEETING_RECORDINGS_DIR, { recursive: true });
 
 const roomRuntimeMessages = new Map();
 const roomCleanupTimers = new Map();
@@ -119,6 +124,16 @@ function ensureRoomAttachmentDir(roomCode) {
     return roomDir;
 }
 
+function getRoomRecordingDir(roomCode) {
+    return path.join(MEETING_RECORDINGS_DIR, roomCode);
+}
+
+function ensureRoomRecordingDir(roomCode) {
+    const roomDir = getRoomRecordingDir(roomCode);
+    fs.mkdirSync(roomDir, { recursive: true });
+    return roomDir;
+}
+
 function scheduleRoomCleanup(roomCode) {
     if (roomCleanupTimers.has(roomCode)) {
         clearTimeout(roomCleanupTimers.get(roomCode));
@@ -138,9 +153,18 @@ function scheduleRoomCleanup(roomCode) {
         fs.rmSync(getRoomAttachmentDir(roomCode), { recursive: true, force: true });
 
         try {
+            const meeting = await getMeetingByCode(roomCode);
             await db.update(meetings)
                 .set({ endedAt: new Date(), updatedAt: new Date() })
                 .where(eq(meetings.meetingCode, roomCode));
+            if (meeting) {
+                await recordMeetingAudit({
+                    meeting,
+                    action: 'meeting_ended',
+                    details: { reason: 'room_empty' },
+                    durationSeconds: secondsBetween(meeting.startedAt, new Date())
+                });
+            }
         } catch (err) {
             console.error('Failed to mark meeting ended:', err);
         }
@@ -154,6 +178,96 @@ function cancelRoomCleanup(roomCode) {
     if (!timer) return;
     clearTimeout(timer);
     roomCleanupTimers.delete(roomCode);
+}
+
+function secondsBetween(start, end) {
+    if (!start || !end) return null;
+    const startMs = new Date(start).getTime();
+    const endMs = new Date(end).getTime();
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < startMs) return null;
+    return Math.max(0, Math.round((endMs - startMs) / 1000));
+}
+
+function auditDetails(details) {
+    if (!details) return null;
+    if (typeof details === 'string') return details;
+    try {
+        return JSON.stringify(details);
+    } catch {
+        return null;
+    }
+}
+
+function parseAuditDetails(details) {
+    if (!details) return null;
+    try {
+        return JSON.parse(details);
+    } catch {
+        return details;
+    }
+}
+
+async function recordMeetingAudit({
+    meeting,
+    meetingCode,
+    userId = null,
+    actorName = null,
+    action,
+    details = null,
+    durationSeconds = null,
+    occurredAt = new Date()
+}) {
+    if (!action || !(meeting?.id || meetingCode)) return;
+
+    try {
+        await db.insert(meetingAuditLogs).values({
+            meetingId: meeting?.id || null,
+            meetingCode: meeting?.meetingCode || meetingCode,
+            userId: userId || null,
+            actorName: actorName || null,
+            action,
+            details: auditDetails(details),
+            durationSeconds,
+            occurredAt
+        });
+    } catch (err) {
+        console.error('Failed to write meeting audit log:', err);
+    }
+}
+
+async function getMeetingByCode(roomCode) {
+    const rows = await db.select().from(meetings).where(eq(meetings.meetingCode, roomCode));
+    return rows[0] || null;
+}
+
+async function ensureInstantMeeting(roomCode, userId, title = 'Instant Meeting') {
+    let meeting = await getMeetingByCode(roomCode);
+    if (meeting || !userId) return meeting;
+
+    try {
+        const inserted = await db.insert(meetings).values({
+            hostId: userId,
+            title,
+            meetingCode: roomCode,
+            startedAt: new Date()
+        }).returning();
+        meeting = inserted[0] || null;
+        if (meeting) {
+            await recordMeetingAudit({
+                meeting,
+                userId,
+                action: 'meeting_created',
+                details: { source: 'instant' }
+            });
+        }
+    } catch (err) {
+        if (err?.code !== '23505') {
+            console.error('Failed to create instant meeting:', err);
+        }
+        meeting = await getMeetingByCode(roomCode);
+    }
+
+    return meeting;
 }
 
 const attachmentStorage = multer.diskStorage({
@@ -173,6 +287,24 @@ const attachmentStorage = multer.diskStorage({
 const uploadAttachment = multer({
     storage: attachmentStorage,
     limits: { fileSize: MAX_ATTACHMENT_BYTES }
+});
+
+const recordingStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        try {
+            cb(null, ensureRoomRecordingDir(req.params.code));
+        } catch (err) {
+            cb(err);
+        }
+    },
+    filename: (req, file, cb) => {
+        cb(null, `${Date.now()}-${randomUUID()}.webm`);
+    }
+});
+
+const uploadRecording = multer({
+    storage: recordingStorage,
+    limits: { fileSize: MAX_RECORDING_BYTES }
 });
 
 function buildAttachmentMessage(roomCode, userId, userName, file, overrides = {}) {
@@ -249,6 +381,78 @@ async function createGoogleCalendarEventForUser(userId, meeting) {
     }
 }
 
+async function getOrCreateDriveFolder(drive, folderName, parentId = null) {
+    const escapedName = folderName.replace(/'/g, "\\'");
+    const parentQuery = parentId ? ` and '${parentId}' in parents` : '';
+    const query = `name='${escapedName}' and mimeType='application/vnd.google-apps.folder' and trashed=false${parentQuery}`;
+
+    const existing = await drive.files.list({
+        q: query,
+        fields: 'files(id,name)',
+        pageSize: 1,
+        spaces: 'drive'
+    });
+
+    if (existing.data.files?.length) {
+        return existing.data.files[0].id;
+    }
+
+    const created = await drive.files.create({
+        requestBody: {
+            name: folderName,
+            mimeType: 'application/vnd.google-apps.folder',
+            ...(parentId ? { parents: [parentId] } : {})
+        },
+        fields: 'id'
+    });
+
+    return created.data.id;
+}
+
+async function uploadRecordingToGoogleDrive(userId, roomCode, localFilePath, localFileName, durationSeconds) {
+    try {
+        const userRows = await db.select({
+            refreshToken: users.googleCalendarRefreshToken
+        }).from(users).where(eq(users.id, userId));
+
+        const refreshToken = userRows[0]?.refreshToken;
+        if (!refreshToken) {
+            return { uploaded: false, reason: 'google-not-connected' };
+        }
+
+        const auth = getGoogleCalendarOAuthClient();
+        auth.setCredentials({ refresh_token: refreshToken });
+        const drive = google.drive({ version: 'v3', auth });
+
+        const rootFolderId = process.env.GOOGLE_DRIVE_RECORDINGS_FOLDER_ID || null;
+        const recordingsFolderId = await getOrCreateDriveFolder(drive, 'Sup Recordings', rootFolderId);
+        const meetingFolderId = await getOrCreateDriveFolder(drive, roomCode, recordingsFolderId);
+
+        const upload = await drive.files.create({
+            requestBody: {
+                name: localFileName,
+                parents: [meetingFolderId],
+                description: `Sup meeting recording (${durationSeconds || 0}s)`
+            },
+            media: {
+                mimeType: 'video/webm',
+                body: fs.createReadStream(localFilePath)
+            },
+            fields: 'id,name,webViewLink,webContentLink'
+        });
+
+        return {
+            uploaded: true,
+            fileId: upload.data.id,
+            name: upload.data.name,
+            webViewLink: upload.data.webViewLink || null,
+            webContentLink: upload.data.webContentLink || null
+        };
+    } catch (err) {
+        return { uploaded: false, reason: 'google-drive-upload-failed', details: err.message };
+    }
+}
+
 async function isHostForRoom(userId, roomCode) {
     const result = await db
         .select({ hostId: meetings.hostId })
@@ -261,8 +465,117 @@ async function isHostForRoom(userId, roomCode) {
 
     return instantRoomHosts.get(roomCode) === userId;
 }
+
+function parseOwnerRepo(repoFullName) {
+    if (!repoFullName || typeof repoFullName !== 'string' || !repoFullName.includes('/')) {
+        return null;
+    }
+    const [owner, repo] = repoFullName.split('/');
+    if (!owner || !repo) return null;
+    return { owner, repo };
+}
+
+async function githubRequest(url, token, options = {}) {
+    return fetch(url, {
+        ...options,
+        headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/vnd.github+json',
+            'User-Agent': 'sup-meeting-app',
+            ...(options.headers || {})
+        }
+    });
+}
+
+async function ensureGitHubRepoExists(owner, repo, token) {
+    const check = await githubRequest(`https://api.github.com/repos/${owner}/${repo}`, token);
+    if (check.ok) return true;
+    if (check.status !== 404) return false;
+
+    const create = await githubRequest('https://api.github.com/user/repos', token, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            name: repo,
+            private: true,
+            auto_init: true,
+            description: 'Sup meeting recordings'
+        })
+    });
+
+    return create.ok;
+}
+
+async function uploadRecordingToLinkedGitHub(userId, roomCode, localFilePath, localFileName, durationSeconds) {
+    try {
+        const githubConn = await db.select({
+            accessToken: oauthConnections.githubAccessToken,
+            displayName: oauthConnections.displayName
+        }).from(oauthConnections).where(and(
+            eq(oauthConnections.userId, userId),
+            eq(oauthConnections.provider, 'github')
+        ));
+
+        if (githubConn.length === 0) {
+            return { uploaded: false, reason: 'github-not-linked' };
+        }
+
+        const token = githubConn[0].accessToken;
+        if (!token) {
+            return { uploaded: false, reason: 'github-token-missing' };
+        }
+
+        const githubUsername = (githubConn[0].displayName || '').replace(/^@/, '').trim();
+        const repoFullName = process.env.GITHUB_RECORDINGS_REPO || (githubUsername ? `${githubUsername}/sup-recordings` : null);
+        const repoParts = parseOwnerRepo(repoFullName);
+        if (!repoParts) {
+            return { uploaded: false, reason: 'github-repo-not-configured' };
+        }
+
+        const repoReady = await ensureGitHubRepoExists(repoParts.owner, repoParts.repo, token);
+        if (!repoReady) {
+            return { uploaded: false, reason: 'github-repo-unavailable' };
+        }
+
+        const fileBuffer = fs.readFileSync(localFilePath);
+        const contentBase64 = fileBuffer.toString('base64');
+        const repoPath = `recordings/${roomCode}/${Date.now()}-${localFileName}`;
+        const branch = process.env.GITHUB_RECORDINGS_BRANCH || undefined;
+        const commitMessage = `Add meeting recording ${roomCode} (${durationSeconds || 0}s)`;
+
+        const uploadResponse = await githubRequest(
+            `https://api.github.com/repos/${repoParts.owner}/${repoParts.repo}/contents/${encodeURIComponent(repoPath).replace(/%2F/g, '/')}`,
+            token,
+            {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    message: commitMessage,
+                    content: contentBase64,
+                    ...(branch ? { branch } : {})
+                })
+            }
+        );
+
+        if (!uploadResponse.ok) {
+            const errBody = await uploadResponse.text();
+            return { uploaded: false, reason: `github-upload-failed:${uploadResponse.status}`, details: errBody };
+        }
+
+        const payload = await uploadResponse.json();
+        return {
+            uploaded: true,
+            repo: `${repoParts.owner}/${repoParts.repo}`,
+            path: repoPath,
+            htmlUrl: payload?.content?.html_url || null,
+            downloadUrl: payload?.content?.download_url || null
+        };
+    } catch (err) {
+        return { uploaded: false, reason: 'github-upload-error', details: err.message };
+    }
+}
 // ============ PASSPORT CONFIG ============
-async function findOrCreateOAuthUser(profile, provider, linkingInfo = null) {
+async function findOrCreateOAuthUser(profile, provider, linkingInfo = null, oauthData = {}) {
     const providerId = String(profile.id);
     const email = profile.emails?.[0]?.value || null;
     const providerDisplayName = provider === 'github'
@@ -311,6 +624,7 @@ async function findOrCreateOAuthUser(profile, provider, linkingInfo = null) {
                         email: email || linkedUser[0].email || null,
                         displayName: providerDisplayName,
                         avatar: profile.photos?.[0]?.value || null,
+                        githubAccessToken: provider === 'github' ? (oauthData.accessToken || existingOAuth[0].githubAccessToken || null) : existingOAuth[0].githubAccessToken,
                         updatedAt: new Date()
                     })
                     .where(eq(oauthConnections.id, existingOAuth[0].id));
@@ -322,7 +636,8 @@ async function findOrCreateOAuthUser(profile, provider, linkingInfo = null) {
                     providerId,
                     email: email || linkedUser[0].email || null,
                     displayName: providerDisplayName,
-                    avatar: profile.photos?.[0]?.value || null
+                    avatar: profile.photos?.[0]?.value || null,
+                    githubAccessToken: provider === 'github' ? (oauthData.accessToken || null) : null
                 });
             }
             
@@ -346,6 +661,7 @@ async function findOrCreateOAuthUser(profile, provider, linkingInfo = null) {
                     email: email || existingUser.email || null,
                     displayName: providerDisplayName,
                     avatar: profile.photos?.[0]?.value || null,
+                    githubAccessToken: provider === 'github' ? (oauthData.accessToken || existingOAuth[0].githubAccessToken || null) : existingOAuth[0].githubAccessToken,
                     updatedAt: new Date()
                 })
                 .where(eq(oauthConnections.id, existingOAuth[0].id));
@@ -356,7 +672,8 @@ async function findOrCreateOAuthUser(profile, provider, linkingInfo = null) {
                 providerId,
                 email: email || existingUser.email || null,
                 displayName: providerDisplayName,
-                avatar: profile.photos?.[0]?.value || null
+                avatar: profile.photos?.[0]?.value || null,
+                githubAccessToken: provider === 'github' ? (oauthData.accessToken || null) : null
             });
         }
 
@@ -386,7 +703,8 @@ async function findOrCreateOAuthUser(profile, provider, linkingInfo = null) {
             providerId,
             email,
             displayName: providerDisplayName,
-            avatar: profile.photos?.[0]?.value || null
+            avatar: profile.photos?.[0]?.value || null,
+            githubAccessToken: provider === 'github' ? (oauthData.accessToken || null) : null
         });
     }
 
@@ -425,7 +743,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
         clientID: process.env.GOOGLE_CLIENT_ID,
         clientSecret: process.env.GOOGLE_CLIENT_SECRET,
         callbackURL: `${BASE_URL}/auth/google/calendar/callback`,
-        scope: ['profile', 'email', GOOGLE_CALENDAR_SCOPE],
+        scope: ['profile', 'email', GOOGLE_CALENDAR_SCOPE, GOOGLE_DRIVE_SCOPE],
         proxy: true,
         passReqToCallback: true
     }, async (req, accessToken, refreshToken, profile, done) => {
@@ -447,7 +765,7 @@ if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
         clientID: process.env.GITHUB_CLIENT_ID,
         clientSecret: process.env.GITHUB_CLIENT_SECRET,
         callbackURL: `${BASE_URL}/auth/github/callback`,
-        scope: ['user:email'],
+        scope: GITHUB_OAUTH_SCOPES,
         passReqToCallback: true
     }, async (req, accessToken, refreshToken, profile, done) => {
         try {
@@ -462,7 +780,7 @@ if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
                 // Not a valid linking token, proceed with normal auth
             }
 
-            const user = await findOrCreateOAuthUser(profile, 'github', linkingInfo);
+            const user = await findOrCreateOAuthUser(profile, 'github', linkingInfo, { accessToken });
             done(null, user);
         } catch (err) {
             done(err, null);
@@ -507,7 +825,7 @@ app.get('/auth/google/calendar', (req, res, next) => {
 
         passport.authenticate('google-calendar', {
             session: false,
-            scope: ['profile', 'email', GOOGLE_CALENDAR_SCOPE],
+            scope: ['profile', 'email', GOOGLE_CALENDAR_SCOPE, GOOGLE_DRIVE_SCOPE],
             accessType: 'offline',
             prompt: 'consent',
             state
@@ -540,7 +858,7 @@ app.get('/auth/google/calendar/callback',
     }
 );
 
-app.get('/auth/github', passport.authenticate('github', { session: false, scope: ['user:email'] }));
+app.get('/auth/github', passport.authenticate('github', { session: false, scope: GITHUB_OAUTH_SCOPES }));
 
 app.get('/auth/github/callback',
     passport.authenticate('github', { session: false, failureRedirect: '/' }),
@@ -982,7 +1300,7 @@ app.post('/api/user/link-provider/github', verifyToken, async (req, res) => {
         const githubAuthUrl = new URL('https://github.com/login/oauth/authorize');
         githubAuthUrl.searchParams.append('client_id', process.env.GITHUB_CLIENT_ID);
         githubAuthUrl.searchParams.append('redirect_uri', `${BASE_URL}/auth/github/callback`);
-        githubAuthUrl.searchParams.append('scope', 'user:email');
+        githubAuthUrl.searchParams.append('scope', GITHUB_OAUTH_SCOPES.join(' '));
         githubAuthUrl.searchParams.append('state', linkingState);
 
         res.json({
@@ -1067,6 +1385,16 @@ app.post('/api/meetings', verifyToken, async (req, res) => {
             scheduledTime: scheduledTime ? new Date(scheduledTime) : null
         }).returning();
 
+        await recordMeetingAudit({
+            meeting: result[0],
+            userId: req.userId,
+            action: scheduledTime ? 'meeting_scheduled' : 'meeting_created',
+            details: {
+                title: title || 'Meeting',
+                scheduledTime: scheduledTime || null
+            }
+        });
+
         let calendar = { inserted: false, reason: 'not-scheduled' };
         if (result[0]?.scheduledTime) {
             calendar = await createGoogleCalendarEventForUser(req.userId, result[0]);
@@ -1121,6 +1449,92 @@ app.get('/api/meetings', verifyToken, async (req, res) => {
     }
 });
 
+app.get('/api/meetings/history', verifyToken, async (req, res) => {
+    try {
+        const accessibleMeetings = await db.select({
+            id: meetings.id,
+            hostId: meetings.hostId,
+            title: meetings.title,
+            meetingCode: meetings.meetingCode,
+            scheduledTime: meetings.scheduledTime,
+            startedAt: meetings.startedAt,
+            endedAt: meetings.endedAt,
+            createdAt: meetings.createdAt,
+            hostName: users.name
+        })
+        .from(meetings)
+        .leftJoin(users, eq(meetings.hostId, users.id))
+        .where(
+            or(
+                eq(meetings.hostId, req.userId),
+                inArray(meetings.id,
+                    db.select({ meetingId: meetingParticipants.meetingId })
+                        .from(meetingParticipants)
+                        .where(eq(meetingParticipants.userId, req.userId))
+                )
+            )
+        )
+        .orderBy(desc(meetings.createdAt));
+
+        const now = new Date();
+        const historyRows = accessibleMeetings.filter((meeting) => {
+            if (meeting.startedAt || meeting.endedAt) return true;
+            if (!meeting.scheduledTime) return true;
+            return new Date(meeting.scheduledTime) < now;
+        });
+
+        const enriched = [];
+        for (const meeting of historyRows) {
+            const [logs, participantRows, recordingRows, messageRows] = await Promise.all([
+                db.select().from(meetingAuditLogs)
+                    .where(eq(meetingAuditLogs.meetingId, meeting.id))
+                    .orderBy(desc(meetingAuditLogs.occurredAt)),
+                db.select({ userId: meetingParticipants.userId })
+                    .from(meetingParticipants)
+                    .where(eq(meetingParticipants.meetingId, meeting.id)),
+                db.select({ id: recordings.id, duration: recordings.duration })
+                    .from(recordings)
+                    .where(eq(recordings.meetingId, meeting.id)),
+                db.select({ id: messages.id })
+                    .from(messages)
+                    .where(eq(messages.meetingId, meeting.id))
+            ]);
+
+            const meetingDurationSeconds = secondsBetween(
+                meeting.startedAt,
+                meeting.endedAt || (meeting.startedAt ? now : null)
+            );
+            const participantDurationSeconds = logs
+                .filter((log) => log.action === 'participant_left' && Number.isFinite(Number(log.durationSeconds)))
+                .reduce((total, log) => total + Number(log.durationSeconds || 0), 0);
+
+            enriched.push({
+                ...meeting,
+                durationSeconds: meetingDurationSeconds,
+                participantDurationSeconds,
+                participantCount: new Set(participantRows.map((row) => row.userId).filter(Boolean)).size,
+                recordingCount: recordingRows.length,
+                recordingDurationSeconds: recordingRows.reduce((total, row) => total + Number(row.duration || 0), 0),
+                messageCount: messageRows.length,
+                auditLogs: logs.map((log) => ({
+                    id: log.id,
+                    userId: log.userId,
+                    actorName: log.actorName,
+                    action: log.action,
+                    details: parseAuditDetails(log.details),
+                    durationSeconds: log.durationSeconds,
+                    occurredAt: log.occurredAt
+                }))
+            });
+        }
+
+        res.json(enriched);
+    } catch (err) {
+        console.error('Meeting history error:', err);
+        res.status(400).json({ error: err.message });
+    }
+});
+
 app.get('/api/meetings/:code', verifyToken, async (req, res) => {
     try {
         const result = await db.select({
@@ -1171,11 +1585,197 @@ app.post('/api/meetings/:code/join', verifyToken, async (req, res) => {
                 meetingId,
                 userId: req.userId
             });
+        } else {
+            await db.update(meetingParticipants)
+                .set({ joinedAt: new Date(), leftAt: null })
+                .where(eq(meetingParticipants.id, existingResult[0].id));
         }
+
+        await recordMeetingAudit({
+            meeting: meetingResult[0],
+            userId: req.userId,
+            action: 'participant_registered',
+            details: { source: 'join_endpoint' }
+        });
         
         res.json({ success: true });
     } catch (err) {
         res.status(400).json({ error: err.message });
+    }
+});
+
+app.post('/api/meetings/:code/recordings/start', verifyToken, async (req, res) => {
+    try {
+        const meetingResult = await db.select().from(meetings).where(eq(meetings.meetingCode, req.params.code));
+        if (meetingResult.length === 0) {
+            return res.status(404).json({ error: 'Meeting not found' });
+        }
+
+        const meeting = meetingResult[0];
+        if (meeting.hostId !== req.userId) {
+            return res.status(403).json({ error: 'Only host can start recording' });
+        }
+
+        await db.update(meetings)
+            .set({ isRecording: true, updatedAt: new Date() })
+            .where(eq(meetings.id, meeting.id));
+
+        await recordMeetingAudit({
+            meeting,
+            userId: req.userId,
+            action: 'recording_started',
+            details: { source: 'host_control' }
+        });
+
+        res.json({ success: true, message: 'Recording started' });
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+});
+
+app.post('/api/meetings/:code/recordings/stop', verifyToken, (req, res, next) => {
+    uploadRecording.single('file')(req, res, (err) => {
+        if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ error: 'Recording must be 300MB or smaller' });
+        }
+        if (err) {
+            return res.status(400).json({ error: err.message });
+        }
+        next();
+    });
+}, async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No recording uploaded' });
+        }
+
+        const meetingResult = await db.select().from(meetings).where(eq(meetings.meetingCode, req.params.code));
+        if (meetingResult.length === 0) {
+            return res.status(404).json({ error: 'Meeting not found' });
+        }
+
+        const meeting = meetingResult[0];
+        if (meeting.hostId !== req.userId) {
+            return res.status(403).json({ error: 'Only host can stop/save recording' });
+        }
+
+        const durationMs = Number(req.body.durationMs || 0);
+        const durationSeconds = Number.isFinite(durationMs) && durationMs > 0
+            ? Math.max(1, Math.round(durationMs / 1000))
+            : null;
+
+        const recordingUrl = `/api/meetings/${encodeURIComponent(req.params.code)}/recordings/files/${encodeURIComponent(req.file.filename)}`;
+        const result = await db.insert(recordings).values({
+            meetingId: meeting.id,
+            recordingUrl,
+            duration: durationSeconds
+        }).returning();
+
+        const saveToGoogleDrive = req.body.saveToGoogleDrive === '1' || req.body.saveToGoogleDrive === 'true';
+        let googleDriveSync = { uploaded: false, reason: 'disabled' };
+        if (saveToGoogleDrive) {
+            googleDriveSync = await uploadRecordingToGoogleDrive(
+                req.userId,
+                req.params.code,
+                req.file.path,
+                req.file.filename,
+                durationSeconds
+            );
+        }
+
+        const githubSync = await uploadRecordingToLinkedGitHub(
+            req.userId,
+            req.params.code,
+            req.file.path,
+            req.file.filename,
+            durationSeconds
+        );
+
+        await db.update(meetings)
+            .set({ isRecording: false, updatedAt: new Date() })
+            .where(eq(meetings.id, meeting.id));
+
+        await recordMeetingAudit({
+            meeting,
+            userId: req.userId,
+            action: 'recording_saved',
+            durationSeconds,
+            details: {
+                recordingUrl,
+                googleDriveUploaded: !!googleDriveSync?.uploaded,
+                githubUploaded: !!githubSync?.uploaded
+            }
+        });
+
+        res.json({
+            success: true,
+            recording: result[0],
+            googleDriveSync,
+            githubSync
+        });
+    } catch (err) {
+        console.error('Recording stop/save error:', err);
+        res.status(400).json({ error: err.message });
+    }
+});
+
+app.get('/api/meetings/:code/recordings', verifyToken, async (req, res) => {
+    try {
+        const meetingResult = await db.select().from(meetings).where(eq(meetings.meetingCode, req.params.code));
+        if (meetingResult.length === 0) {
+            return res.status(404).json({ error: 'Meeting not found' });
+        }
+
+        const meeting = meetingResult[0];
+        const participantRows = await db.select({ id: meetingParticipants.id })
+            .from(meetingParticipants)
+            .where(and(
+                eq(meetingParticipants.meetingId, meeting.id),
+                eq(meetingParticipants.userId, req.userId)
+            ));
+
+        const hasAccess = meeting.hostId === req.userId || participantRows.length > 0;
+        if (!hasAccess) {
+            return res.status(403).json({ error: 'You do not have access to this meeting recordings' });
+        }
+
+        const rows = await db.select().from(recordings).where(eq(recordings.meetingId, meeting.id));
+        res.json(rows);
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+});
+
+app.get('/api/meetings/:code/recordings/files/:fileName', verifyToken, async (req, res) => {
+    try {
+        const meetingResult = await db.select().from(meetings).where(eq(meetings.meetingCode, req.params.code));
+        if (meetingResult.length === 0) {
+            return res.status(404).json({ error: 'Meeting not found' });
+        }
+
+        const meeting = meetingResult[0];
+        const participantRows = await db.select({ id: meetingParticipants.id })
+            .from(meetingParticipants)
+            .where(and(
+                eq(meetingParticipants.meetingId, meeting.id),
+                eq(meetingParticipants.userId, req.userId)
+            ));
+
+        const hasAccess = meeting.hostId === req.userId || participantRows.length > 0;
+        if (!hasAccess) {
+            return res.status(403).json({ error: 'You do not have access to this recording' });
+        }
+
+        const filePath = path.join(getRoomRecordingDir(req.params.code), req.params.fileName);
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({ error: 'Recording file not found' });
+        }
+
+        res.setHeader('Content-Type', 'video/webm');
+        res.setHeader('Content-Disposition', `attachment; filename="${req.params.code}-recording.webm"`);
+        res.sendFile(filePath);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
 });
 
@@ -1573,34 +2173,89 @@ io.on('connection', (socket) => {
     socket.on('join-room', async (room, userId, userName, ack) => {
         const roomBefore = io.sockets.adapter.rooms.get(room);
         const isFirstJoiner = !roomBefore || roomBefore.size === 0;
+        const joinedAt = new Date();
         
         cancelRoomCleanup(room);
         socket.join(room);
-        connectedUsers[socket.id] = { userId, room, name: userName || 'User' };
         
         let isHost = false;
-        // Check DB first for scheduled meetings
-        const dbMeeting = await db.select({ hostId: meetings.hostId }).from(meetings).where(eq(meetings.meetingCode, room));
-        if (dbMeeting.length > 0) {
-            isHost = dbMeeting[0].hostId === userId;
+        let meeting = await getMeetingByCode(room);
+        if (meeting) {
+            isHost = meeting.hostId === userId;
         } else if (isFirstJoiner) {
             // Ad-hoc meeting, first joiner is host
             instantRoomHosts.set(room, userId);
             isHost = true;
+            meeting = await ensureInstantMeeting(room, userId);
         } else {
             // Arriving later at an instant meeting
             isHost = instantRoomHosts.get(room) === userId;
+            meeting = await getMeetingByCode(room);
         }
+
+        connectedUsers[socket.id] = {
+            userId,
+            room,
+            name: userName || 'User',
+            joinedAt,
+            meetingId: meeting?.id || null
+        };
         
         socket.to(room).emit('user-joined', socket.id, userName);
         if (typeof ack === 'function') ack({ isHost });
 
-        db.update(meetings)
-            .set({ startedAt: new Date(), endedAt: null, updatedAt: new Date() })
-            .where(eq(meetings.meetingCode, room))
-            .catch((err) => {
-                console.error('Failed to mark meeting started:', err);
-            });
+        if (meeting) {
+            const shouldMarkStarted = !meeting.startedAt || !!meeting.endedAt;
+
+            try {
+                await db.update(meetings)
+                    .set({ startedAt: meeting.startedAt || joinedAt, endedAt: null, updatedAt: joinedAt })
+                    .where(eq(meetings.id, meeting.id));
+
+                if (userId) {
+                    const existingParticipant = await db.select()
+                        .from(meetingParticipants)
+                        .where(and(
+                            eq(meetingParticipants.meetingId, meeting.id),
+                            eq(meetingParticipants.userId, userId)
+                        ));
+
+                    if (existingParticipant.length === 0) {
+                        await db.insert(meetingParticipants).values({
+                            meetingId: meeting.id,
+                            userId,
+                            joinedAt
+                        });
+                    } else {
+                        await db.update(meetingParticipants)
+                            .set({ joinedAt, leftAt: null })
+                            .where(eq(meetingParticipants.id, existingParticipant[0].id));
+                    }
+                }
+
+                if (shouldMarkStarted) {
+                    await recordMeetingAudit({
+                        meeting,
+                        userId,
+                        actorName: userName || 'User',
+                        action: 'meeting_started',
+                        details: { source: isFirstJoiner ? 'first_joiner' : 'rejoin' },
+                        occurredAt: joinedAt
+                    });
+                }
+
+                await recordMeetingAudit({
+                    meeting,
+                    userId,
+                    actorName: userName || 'User',
+                    action: 'participant_joined',
+                    details: { socketId: socket.id, host: isHost },
+                    occurredAt: joinedAt
+                });
+            } catch (err) {
+                console.error('Failed to record meeting join:', err);
+            }
+        }
     });
 
     socket.on('signal', (data) => {
@@ -1697,10 +2352,42 @@ io.on('connection', (socket) => {
         io.to(to).emit('e2ee-key-offer', { from: socket.id, wrappedKey, iv, hostPubKey });
     });
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
         const userData = connectedUsers[socket.id];
         if (userData) {
             io.to(userData.room).emit('user-left', socket.id);
+            const leftAt = new Date();
+            const durationSeconds = secondsBetween(userData.joinedAt, leftAt);
+
+            try {
+                const meeting = userData.meetingId
+                    ? (await db.select().from(meetings).where(eq(meetings.id, userData.meetingId)))[0]
+                    : await getMeetingByCode(userData.room);
+
+                if (meeting && userData.userId) {
+                    await db.update(meetingParticipants)
+                        .set({ leftAt })
+                        .where(and(
+                            eq(meetingParticipants.meetingId, meeting.id),
+                            eq(meetingParticipants.userId, userData.userId)
+                        ));
+                }
+
+                if (meeting) {
+                    await recordMeetingAudit({
+                        meeting,
+                        userId: userData.userId,
+                        actorName: userData.name || 'User',
+                        action: 'participant_left',
+                        details: { socketId: socket.id },
+                        durationSeconds,
+                        occurredAt: leftAt
+                    });
+                }
+            } catch (err) {
+                console.error('Failed to record meeting leave:', err);
+            }
+
             const room = io.sockets.adapter.rooms.get(userData.room);
             if (!room || room.size === 0) {
                 scheduleRoomCleanup(userData.room);

@@ -43,6 +43,7 @@ export const oauthConnections = pgTable('oauth_connections', {
     email: varchar('email', { length: 255 }),
     displayName: varchar('display_name', { length: 255 }),
     avatar: varchar('avatar', { length: 500 }),
+    githubAccessToken: text('github_access_token'),
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow()
 });
@@ -100,6 +101,24 @@ export const recordings = pgTable('recordings', {
     duration: integer('duration'),
     createdAt: timestamp('created_at').defaultNow()
 });
+
+export const meetingAuditLogs = pgTable('meeting_audit_logs', {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    meetingId: integer('meeting_id').references(() => meetings.id, { onDelete: 'cascade' }),
+    meetingCode: varchar('meeting_code', { length: 50 }).notNull(),
+    userId: integer('user_id').references(() => users.id, { onDelete: 'set null' }),
+    actorName: varchar('actor_name', { length: 255 }),
+    action: varchar('action', { length: 80 }).notNull(),
+    details: text('details'),
+    durationSeconds: integer('duration_seconds'),
+    occurredAt: timestamp('occurred_at').defaultNow(),
+    createdAt: timestamp('created_at').defaultNow()
+}, (table) => ({
+    meetingIdx: index('meeting_audit_logs_meeting_idx').on(table.meetingId),
+    meetingCodeIdx: index('meeting_audit_logs_code_idx').on(table.meetingCode),
+    userIdx: index('meeting_audit_logs_user_idx').on(table.userId),
+    occurredAtIdx: index('meeting_audit_logs_occurred_at_idx').on(table.occurredAt)
+}));
 
 export const raisedHands = pgTable('raised_hands', {
     id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
