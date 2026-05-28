@@ -207,6 +207,46 @@ function parseAuditDetails(details) {
     }
 }
 
+let meetingAuditSchemaReady = false;
+let meetingAuditSchemaPromise = null;
+
+async function ensureMeetingAuditSchema() {
+    if (meetingAuditSchemaReady) return true;
+    if (meetingAuditSchemaPromise) return meetingAuditSchemaPromise;
+
+    meetingAuditSchemaPromise = (async () => {
+        try {
+            await db.execute(sql`CREATE EXTENSION IF NOT EXISTS pgcrypto`);
+            await db.execute(sql`
+                CREATE TABLE IF NOT EXISTS meeting_audit_logs (
+                    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                    meeting_id integer REFERENCES meetings(id) ON DELETE CASCADE,
+                    meeting_code varchar(50) NOT NULL,
+                    user_id integer REFERENCES users(id) ON DELETE SET NULL,
+                    actor_name varchar(255),
+                    action varchar(80) NOT NULL,
+                    details text,
+                    duration_seconds integer,
+                    occurred_at timestamp DEFAULT now(),
+                    created_at timestamp DEFAULT now()
+                )
+            `);
+            await db.execute(sql`CREATE INDEX IF NOT EXISTS meeting_audit_logs_meeting_idx ON meeting_audit_logs(meeting_id)`);
+            await db.execute(sql`CREATE INDEX IF NOT EXISTS meeting_audit_logs_code_idx ON meeting_audit_logs(meeting_code)`);
+            await db.execute(sql`CREATE INDEX IF NOT EXISTS meeting_audit_logs_user_idx ON meeting_audit_logs(user_id)`);
+            await db.execute(sql`CREATE INDEX IF NOT EXISTS meeting_audit_logs_occurred_at_idx ON meeting_audit_logs(occurred_at)`);
+            meetingAuditSchemaReady = true;
+            return true;
+        } catch (err) {
+            meetingAuditSchemaPromise = null;
+            console.error('Failed to ensure meeting audit schema:', err);
+            return false;
+        }
+    })();
+
+    return meetingAuditSchemaPromise;
+}
+
 async function recordMeetingAudit({
     meeting,
     meetingCode,
@@ -220,6 +260,9 @@ async function recordMeetingAudit({
     if (!action || !(meeting?.id || meetingCode)) return;
 
     try {
+        const schemaReady = await ensureMeetingAuditSchema();
+        if (!schemaReady) return;
+
         await db.insert(meetingAuditLogs).values({
             meetingId: meeting?.id || null,
             meetingCode: meeting?.meetingCode || meetingCode,
@@ -231,6 +274,13 @@ async function recordMeetingAudit({
             occurredAt
         });
     } catch (err) {
+        if (err?.code === '42P01') {
+            meetingAuditSchemaReady = false;
+            meetingAuditSchemaPromise = null;
+            console.warn('Meeting audit table was missing; it will be recreated on the next audit write.');
+            return;
+        }
+
         console.error('Failed to write meeting audit log:', err);
     }
 }
@@ -1451,6 +1501,8 @@ app.get('/api/meetings', verifyToken, async (req, res) => {
 
 app.get('/api/meetings/history', verifyToken, async (req, res) => {
     try {
+        await ensureMeetingAuditSchema();
+
         const accessibleMeetings = await db.select({
             id: meetings.id,
             hostId: meetings.hostId,
@@ -2417,4 +2469,11 @@ function startServer(port, attempt = 0) {
     });
 }
 
-startServer(BASE_PORT);
+ensureMeetingAuditSchema()
+    .catch((err) => {
+        console.error('Meeting audit schema check failed:', err);
+        return false;
+    })
+    .finally(() => {
+        startServer(BASE_PORT);
+    });

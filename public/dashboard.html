@@ -276,13 +276,26 @@
         }
         .history-list {
             display: grid;
-            gap: 14px;
+            gap: 12px;
         }
         .history-card {
-            background: rgba(255, 255, 255, 0.68);
+            position: relative;
+            overflow: hidden;
+            background:
+                linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.66)),
+                radial-gradient(circle at top right, rgba(20, 184, 166, 0.08), transparent 30%);
             border: 1px solid var(--line);
             border-radius: 8px;
-            padding: 18px;
+            padding: 18px 18px 16px;
+        }
+        .history-card::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: linear-gradient(180deg, var(--brand), #14b8a6);
         }
         .history-top {
             display: flex;
@@ -296,6 +309,16 @@
             color: var(--ink);
             font-size: 17px;
             margin-bottom: 4px;
+        }
+        .history-code {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 7px;
+            border-radius: 6px;
+            background: rgba(15, 23, 42, 0.06);
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 12px;
+            color: #334155;
         }
         .history-meta,
         .audit-line {
@@ -312,11 +335,16 @@
         .history-chip {
             padding: 7px 9px;
             border-radius: 8px;
-            background: rgba(37, 99, 235, 0.08);
-            border: 1px solid rgba(37, 99, 235, 0.1);
-            color: #17416f;
+            background: rgba(15, 23, 42, 0.055);
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            color: #1f2937;
             font-size: 12px;
             font-weight: 700;
+        }
+        .history-chip.primary {
+            color: #0f4f73;
+            background: rgba(14, 165, 233, 0.1);
+            border-color: rgba(14, 165, 233, 0.14);
         }
         .audit-list {
             display: grid;
@@ -326,10 +354,23 @@
             border-top: 1px solid var(--line);
         }
         .audit-line {
+            position: relative;
             display: grid;
-            grid-template-columns: 112px 1fr;
+            grid-template-columns: 104px 1fr;
             gap: 10px;
             align-items: baseline;
+            padding-left: 16px;
+        }
+        .audit-line::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 8px;
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #14b8a6;
+            box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.12);
         }
         .audit-time {
             font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -339,6 +380,11 @@
         .audit-action {
             color: var(--ink);
             font-weight: 700;
+        }
+        .audit-empty {
+            color: var(--muted);
+            font-size: 13px;
+            padding: 10px 0 0;
         }
         .card-buttons {
             display: flex;
@@ -857,13 +903,13 @@
                     + '<div class="history-top">'
                     + '<div>'
                     + '<div class="history-title">' + escapeHtml(meeting.title || 'Meeting') + '</div>'
-                    + '<div class="history-meta">Host: ' + escapeHtml(meeting.hostName || 'Unknown') + ' · Code: ' + escapeHtml(code) + '</div>'
+                    + '<div class="history-meta">Host: ' + escapeHtml(meeting.hostName || 'Unknown') + ' · <span class="history-code">' + escapeHtml(code) + '</span></div>'
                     + '</div>'
                     + '<button class="btn-secondary" onclick="joinMeetingByCode(\'' + escapeHtml(code) + '\')">Reopen</button>'
                     + '</div>'
                     + '<div class="history-meta">Started: ' + escapeHtml(started) + ' · Ended: ' + escapeHtml(ended) + '</div>'
                     + '<div class="history-stats">'
-                    + '<span class="history-chip">Meeting: ' + escapeHtml(duration) + '</span>'
+                    + '<span class="history-chip primary">Meeting: ' + escapeHtml(duration) + '</span>'
                     + '<span class="history-chip">Participant time: ' + escapeHtml(participantTime) + '</span>'
                     + '<span class="history-chip">' + Number(meeting.participantCount || 0) + ' participant' + (Number(meeting.participantCount || 0) === 1 ? '' : 's') + '</span>'
                     + '<span class="history-chip">' + Number(meeting.recordingCount || 0) + ' recording' + (Number(meeting.recordingCount || 0) === 1 ? '' : 's') + '</span>'
@@ -876,7 +922,7 @@
 
         function renderAuditLines(logs) {
             if (!logs.length) {
-                return '<div class="audit-list"><div class="audit-line"><span class="audit-time">--</span><span>No audit events recorded yet.</span></div></div>';
+                return '<div class="audit-empty">No audit events recorded yet.</div>';
             }
 
             return '<div class="audit-list">' + logs.map(function (log) {
