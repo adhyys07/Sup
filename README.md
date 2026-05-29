@@ -1,6 +1,6 @@
 # Sup!
 
-Sup! is a full-stack video meeting workspace built with Express, Socket.IO, WebRTC, PostgreSQL, Drizzle ORM, and vanilla HTML/CSS/JavaScript.
+Sup! is a full-stack video meeting workspace built for innovators, it has various tools integrated in your meeting to make your calls more productive and to make the workflow faster.
 
 ## Features
 
@@ -16,7 +16,6 @@ Sup! is a full-stack video meeting workspace built with Express, Socket.IO, WebR
 - Meeting recordings with optional Google Drive/GitHub sync
 - Google Calendar and ICS support
 - Past meeting audit logs with durations and activity history
-- 3D/glass-inspired UI
 
 ## Stack
 

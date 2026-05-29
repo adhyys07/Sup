@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Sup!</title>
+    <style>
+        :root {
+            --bg: #f4f7fb;
+            --surface: #ffffff;
+            --surface-soft: #f8fafc;
+            --line: #d9e2ec;
+            --line-strong: #c4d0dc;
+            --ink: #172033;
+            --muted: #647084;
+            --brand: #0f8f8c;
+            --brand-strong: #1166b8;
+            --accent: #f0b429;
+            --danger: #d64545;
+            --success: #10805b;
+            --shadow: 0 18px 50px rgba(23, 32, 51, 0.12);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            min-height: 100vh;
+            font-family: "Trebuchet MS", "Avenir Next", "Segoe UI", sans-serif;
+            color: var(--ink);
+            background:
+                linear-gradient(120deg, rgba(15, 143, 140, 0.12), transparent 32%),
+                linear-gradient(260deg, rgba(240, 180, 41, 0.12), transparent 30%),
+                linear-gradient(180deg, #f8fbff 0%, var(--bg) 100%);
+        }
+
+        button,
+        input,
+        select {
+            font: inherit;
+        }
+
+        button {
+            border: 0;
+            cursor: pointer;
+        }
+
+        .shell {
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: 248px minmax(0, 1fr);
+        }
+
+        .sidebar {
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            padding: 24px 18px;
+            background: rgba(255, 255, 255, 0.86);
+            border-right: 1px solid var(--line);
+            backdrop-filter: blur(14px);
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 20px;
+            font-weight: 800;
+            color: var(--ink);
+        }
+
+        .brand-mark {
+            width: 38px;
+            height: 38px;
+            border-radius: 12px;
+            display: grid;
+            place-items: center;
+            color: white;
+            background: linear-gradient(135deg, var(--brand), var(--brand-strong));
+            box-shadow: 0 12px 26px rgba(17, 102, 184, 0.24);
+        }
+
+        .icon {
+            width: 18px;
+            height: 18px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .nav {
+            display: grid;
+            gap: 8px;
+        }
+
+        .nav button,
+        .nav a {
+            min-height: 42px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            color: var(--muted);
+            background: transparent;
+            text-decoration: none;
+            font-weight: 800;
+            text-align: left;
+            transition: background 0.18s, color 0.18s;
+        }
+
+        .nav button.active,
+        .nav button:hover,
+        .nav a:hover {
+            color: var(--brand-strong);
+            background: rgba(17, 102, 184, 0.08);
+        }
+
+        .sidebar-footer {
+            margin-top: auto;
+            display: grid;
+            gap: 10px;
+        }
+
+        .admin-user {
+            padding: 12px;
+            border-radius: 8px;
+            background: var(--surface-soft);
+            border: 1px solid var(--line);
+            min-width: 0;
+        }
+
+        .admin-user strong,
+        .admin-user span {
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .admin-user span {
+            color: var(--muted);
+            font-size: 13px;
+            margin-top: 4px;
+        }
+
+        .main {
+            min-width: 0;
+            padding: 26px;
+        }
+
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 22px;
+        }
+
+        .page-title h1 {
+            font-size: 30px;
+            line-height: 1.1;
+            letter-spacing: 0;
+        }
+
+        .page-title p {
+            color: var(--muted);
+            margin-top: 6px;
+            font-size: 14px;
+        }
+
+        .actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            min-height: 40px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-weight: 800;
+            color: var(--ink);
+            background: var(--surface);
+            border: 1px solid var(--line);
+            text-decoration: none;
+            transition: transform 0.18s, border-color 0.18s, background 0.18s;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            border-color: var(--line-strong);
+        }
+
+        .btn.primary {
+            color: white;
+            background: linear-gradient(135deg, var(--brand), var(--brand-strong));
+            border-color: transparent;
+        }
+
+        .btn.danger {
+            color: white;
+            background: var(--danger);
+            border-color: transparent;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(6, minmax(120px, 1fr));
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .metric {
+            min-height: 112px;
+            padding: 16px;
+            border-radius: 8px;
+            background: var(--surface);
+            border: 1px solid var(--line);
+            box-shadow: 0 10px 24px rgba(23, 32, 51, 0.06);
+            display: grid;
+            align-content: space-between;
+            gap: 12px;
+        }
+
+        .metric-top {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            color: var(--muted);
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        .metric-value {
+            font-size: 30px;
+            font-weight: 900;
+            color: var(--ink);
+            line-height: 1;
+        }
+
+        .panel {
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .panel + .panel {
+            margin-top: 18px;
+        }
+
+        .panel-head {
+            min-height: 72px;
+            padding: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            border-bottom: 1px solid var(--line);
+            background: rgba(248, 250, 252, 0.84);
+        }
+
+        .panel-head h2 {
+            font-size: 18px;
+            line-height: 1.2;
+        }
+
+        .panel-head p {
+            color: var(--muted);
+            margin-top: 4px;
+            font-size: 13px;
+        }
+
+        .filters {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .field {
+            min-height: 40px;
+            min-width: 150px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: white;
+            color: var(--ink);
+            padding: 9px 11px;
+            outline: none;
+        }
+
+        .field:focus {
+            border-color: rgba(17, 102, 184, 0.46);
+            box-shadow: 0 0 0 3px rgba(17, 102, 184, 0.12);
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 860px;
+        }
+
+        th,
+        td {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--line);
+            text-align: left;
+            vertical-align: top;
+            font-size: 14px;
+        }
+
+        th {
+            color: var(--muted);
+            background: var(--surface-soft);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0;
+        }
+
+        tbody tr:hover {
+            background: rgba(15, 143, 140, 0.05);
+        }
+
+        .mono {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 12px;
+        }
+
+        .strong {
+            font-weight: 900;
+        }
+
+        .muted {
+            color: var(--muted);
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            min-height: 26px;
+            padding: 5px 8px;
+            border-radius: 8px;
+            color: var(--ink);
+            background: var(--surface-soft);
+            border: 1px solid var(--line);
+            font-size: 12px;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .pill.active {
+            color: #075e56;
+            background: rgba(15, 143, 140, 0.1);
+            border-color: rgba(15, 143, 140, 0.2);
+        }
+
+        .pill.ended {
+            color: #4f5665;
+        }
+
+        .pill.scheduled {
+            color: #805a08;
+            background: rgba(240, 180, 41, 0.12);
+            border-color: rgba(240, 180, 41, 0.28);
+        }
+
+        .empty,
+        .error {
+            padding: 28px;
+            color: var(--muted);
+            text-align: center;
+        }
+
+        .error {
+            color: var(--danger);
+        }
+
+        .section {
+            display: none;
+        }
+
+        .section.active {
+            display: block;
+        }
+
+        .modal {
+            position: fixed;
+            inset: 0;
+            z-index: 40;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: rgba(16, 24, 40, 0.48);
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-panel {
+            width: min(980px, 100%);
+            max-height: min(860px, 90vh);
+            overflow: hidden;
+            border-radius: 8px;
+            background: white;
+            box-shadow: 0 28px 80px rgba(16, 24, 40, 0.28);
+            display: grid;
+            grid-template-rows: auto minmax(0, 1fr);
+        }
+
+        .modal-head {
+            padding: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            border-bottom: 1px solid var(--line);
+            background: var(--surface-soft);
+        }
+
+        .modal-body {
+            padding: 18px;
+            overflow: auto;
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(120px, 1fr));
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .detail-cell {
+            min-height: 82px;
+            padding: 12px;
+            border-radius: 8px;
+            background: var(--surface-soft);
+            border: 1px solid var(--line);
+        }
+
+        .detail-cell span {
+            display: block;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 800;
+            margin-bottom: 8px;
+        }
+
+        .detail-cell strong {
+            font-size: 15px;
+            word-break: break-word;
+        }
+
+        .stack {
+            display: grid;
+            gap: 10px;
+        }
+
+        .log-line {
+            display: grid;
+            grid-template-columns: 150px 1fr;
+            gap: 12px;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid var(--line);
+            background: white;
+        }
+
+        .loading {
+            opacity: 0.62;
+            pointer-events: none;
+        }
+
+        .access-denied {
+            min-height: 100vh;
+            display: none;
+            place-items: center;
+            padding: 24px;
+        }
+
+        .access-denied.active {
+            display: grid;
+        }
+
+        .access-panel {
+            width: min(460px, 100%);
+            padding: 28px;
+            border-radius: 8px;
+            background: white;
+            border: 1px solid var(--line);
+            box-shadow: var(--shadow);
+        }
+
+        .access-panel h1 {
+            font-size: 24px;
+            margin: 14px 0 8px;
+        }
+
+        .access-panel p {
+            color: var(--muted);
+            line-height: 1.5;
+            margin-bottom: 18px;
+        }
+
+        @media (max-width: 1100px) {
+            .summary-grid {
+                grid-template-columns: repeat(3, minmax(140px, 1fr));
+            }
+        }
+
+        @media (max-width: 840px) {
+            .shell {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                position: static;
+                height: auto;
+                padding: 16px;
+            }
+
+            .nav {
+                grid-template-columns: repeat(3, 1fr);
+            }
+
+            .sidebar-footer {
+                grid-template-columns: 1fr 1fr;
+                align-items: stretch;
+            }
+
+            .main {
+                padding: 18px;
+            }
+
+            .topbar,
+            .panel-head {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .summary-grid,
+            .detail-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 560px) {
+            .summary-grid,
+            .detail-grid,
+            .sidebar-footer,
+            .nav {
+                grid-template-columns: 1fr;
+            }
+
+            .filters,
+            .actions {
+                width: 100%;
+            }
+
+            .field,
+            .btn {
+                width: 100%;
+            }
+
+            .log-line {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="access-denied" id="accessDenied">
+        <div class="access-panel">
+            <span class="brand-mark" id="accessIcon"></span>
+            <h1>Admin Access Required</h1>
+            <p>This area is only available to workspace admins.</p>
+            <a class="btn primary" href="/dashboard.html"><span data-icon="arrowLeft"></span>Back to Dashboard</a>
+        </div>
+    </div>
+
+    <div class="shell" id="adminShell" hidden>
+        <aside class="sidebar">
+            <div class="brand">
+                <span class="brand-mark" id="brandIcon"></span>
+                <span>Sup Admin</span>
+            </div>
+
+            <nav class="nav" aria-label="Admin sections">
+                <button class="active" data-section="overview" type="button"><span data-icon="layout"></span>Overview</button>
+                <button data-section="meetings" type="button"><span data-icon="video"></span>Meetings</button>
+                <button data-section="audit" type="button"><span data-icon="activity"></span>Audit Logs</button>
+                <button data-section="users" type="button"><span data-icon="users"></span>Users</button>
+                <a href="/dashboard.html"><span data-icon="home"></span>Dashboard</a>
+                <a href="/profile.html"><span data-icon="user"></span>Profile</a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="admin-user">
+                    <strong id="adminName">Admin</strong>
+                    <span id="adminEmail">Loading</span>
+                </div>
+                <button class="btn danger" type="button" onclick="logout()"><span data-icon="logout"></span>Logout</button>
+            </div>
+        </aside>
+
+        <main class="main">
+            <div class="topbar">
+                <div class="page-title">
+                    <h1>Meeting Operations</h1>
+                    <p id="lastUpdated">Loading admin data</p>
+                </div>
+                <div class="actions">
+                    <button class="btn" type="button" onclick="refreshCurrentSection()"><span data-icon="refresh"></span>Refresh</button>
+                    <a class="btn primary" href="/dashboard.html"><span data-icon="arrowLeft"></span>Back to App</a>
+                </div>
+            </div>
+
+            <section class="summary-grid" id="summaryGrid"></section>
+
+            <section class="section active" id="overviewSection">
+                <div class="panel">
+                    <div class="panel-head">
+                        <div>
+                            <h2>Recent Activity</h2>
+                            <p>Latest meeting audit events across the workspace.</p>
+                        </div>
+                    </div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Meeting</th>
+                                    <th>Actor</th>
+                                    <th>Action</th>
+                                    <th>Duration</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recentAuditBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <section class="section" id="meetingsSection">
+                <div class="panel">
+                    <div class="panel-head">
+                        <div>
+                            <h2>All Meetings</h2>
+                            <p>Filter by status, host id, or meeting code.</p>
+                        </div>
+                        <div class="filters">
+                            <select class="field" id="meetingStatus">
+                                <option value="">All statuses</option>
+                                <option value="active">Active</option>
+                                <option value="scheduled">Scheduled</option>
+                                <option value="ended">Ended</option>
+                            </select>
+                            <input class="field" id="meetingCode" placeholder="Meeting code">
+                            <input class="field" id="meetingHostId" placeholder="Host id" inputmode="numeric">
+                            <button class="btn primary" type="button" onclick="loadMeetings()"><span data-icon="filter"></span>Apply</button>
+                        </div>
+                    </div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Meeting</th>
+                                    <th>Host</th>
+                                    <th>Status</th>
+                                    <th>Duration</th>
+                                    <th>Activity</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="meetingsBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <section class="section" id="auditSection">
+                <div class="panel">
+                    <div class="panel-head">
+                        <div>
+                            <h2>Audit Logs</h2>
+                            <p>Search global meeting events.</p>
+                        </div>
+                        <div class="filters">
+                            <input class="field" id="auditMeetingCode" placeholder="Meeting code">
+                            <input class="field" id="auditUserId" placeholder="User id" inputmode="numeric">
+                            <input class="field" id="auditAction" placeholder="Action">
+                            <button class="btn primary" type="button" onclick="loadAuditLogs()"><span data-icon="filter"></span>Apply</button>
+                        </div>
+                    </div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Meeting</th>
+                                    <th>User</th>
+                                    <th>Action</th>
+                                    <th>Details</th>
+                                </tr>
+                            </thead>
+                            <tbody id="auditBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <section class="section" id="usersSection">
+                <div class="panel">
+                    <div class="panel-head">
+                        <div>
+                            <h2>Users</h2>
+                            <p>Accounts with hosted and joined meeting counts.</p>
+                        </div>
+                    </div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>User</th>
+                                    <th>Auth</th>
+                                    <th>Email</th>
+                                    <th>Calendar</th>
+                                    <th>Meetings</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div class="modal" id="meetingModal" aria-hidden="true">
+        <div class="modal-panel">
+            <div class="modal-head">
+                <div>
+                    <h2 id="meetingModalTitle">Meeting</h2>
+                    <p class="muted" id="meetingModalMeta"></p>
+                </div>
+                <button class="btn" type="button" onclick="closeMeetingModal()"><span data-icon="close"></span>Close</button>
+            </div>
+            <div class="modal-body" id="meetingModalBody"></div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        const state = {
+            section: 'overview',
+            summary: null,
+            meetings: [],
+            users: [],
+            auditLogs: []
+        };
+
+        const icons = {
+            activity: '<svg class="icon" viewBox="0 0 24 24"><path d="M22 12h-4l-3 8-6-16-3 8H2"></path></svg>',
+            arrowLeft: '<svg class="icon" viewBox="0 0 24 24"><path d="M19 12H5"></path><path d="m12 19-7-7 7-7"></path></svg>',
+            close: '<svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>',
+            filter: '<svg class="icon" viewBox="0 0 24 24"><path d="M22 3H2l8 9.5V20l4 2v-9.5L22 3Z"></path></svg>',
+            home: '<svg class="icon" viewBox="0 0 24 24"><path d="m3 11 9-8 9 8"></path><path d="M5 10v10h14V10"></path></svg>',
+            layout: '<svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>',
+            logout: '<svg class="icon" viewBox="0 0 24 24"><path d="M10 17l5-5-5-5"></path><path d="M15 12H3"></path><path d="M12 4h7v16h-7"></path></svg>',
+            refresh: '<svg class="icon" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 1-15.4 6.4"></path><path d="M3 12A9 9 0 0 1 18.4 5.6"></path><path d="M18 2v4h-4"></path><path d="M6 22v-4h4"></path></svg>',
+            user: '<svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path></svg>',
+            users: '<svg class="icon" viewBox="0 0 24 24"><path d="M16 21a6 6 0 0 0-12 0"></path><circle cx="10" cy="8" r="4"></circle><path d="M22 21a5 5 0 0 0-5-5"></path><path d="M17 4a4 4 0 0 1 0 8"></path></svg>',
+            video: '<svg class="icon" viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2"></rect><path d="m16 10 5-3v10l-5-3Z"></path></svg>'
+        };
+
+        function icon(name) {
+            return icons[name] || '';
+        }
+
+        function hydrateIcons(root = document) {
+            root.querySelectorAll('[data-icon]').forEach((el) => {
+                el.innerHTML = icon(el.dataset.icon);
+            });
+        }
+
+        async function api(path) {
+            const response = await fetch(path, {
+                headers: { Authorization: 'Bearer ' + token }
+            });
+            const text = await response.text();
+            const data = text ? JSON.parse(text) : {};
+            if (!response.ok) {
+                throw new Error(data.error || 'Request failed');
+            }
+            return data;
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            }[char]));
+        }
+
+        function formatDate(value) {
+            if (!value) return 'Not set';
+            const date = new Date(value);
+            if (!Number.isFinite(date.getTime())) return 'Not set';
+            return date.toLocaleString([], {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function formatDuration(seconds) {
+            const total = Number(seconds);
+            if (!Number.isFinite(total) || total <= 0) return '0m';
+            const hours = Math.floor(total / 3600);
+            const minutes = Math.floor((total % 3600) / 60);
+            const secs = Math.floor(total % 60);
+            if (hours) return hours + 'h ' + minutes + 'm';
+            if (minutes) return minutes + 'm ' + secs + 's';
+            return secs + 's';
+        }
+
+        function formatDetails(details) {
+            if (!details) return 'None';
+            if (typeof details === 'string') return details;
+            return Object.entries(details)
+                .map(([key, value]) => key + ': ' + value)
+                .join(', ') || 'None';
+        }
+
+        function formatAction(action) {
+            return String(action || 'event')
+                .split('_')
+                .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ');
+        }
+
+        function meetingStatus(meeting) {
+            if (meeting.endedAt) return 'ended';
+            if (meeting.startedAt) return 'active';
+            if (meeting.scheduledTime) return 'scheduled';
+            return 'active';
+        }
+
+        function setLoading(isLoading) {
+            document.body.classList.toggle('loading', isLoading);
+        }
+
+        function showError(targetId, message) {
+            const target = document.getElementById(targetId);
+            if (target) {
+                target.innerHTML = '<tr><td colspan="6" class="error">' + escapeHtml(message) + '</td></tr>';
+            }
+        }
+
+        function showAccessDenied() {
+            document.getElementById('adminShell').hidden = true;
+            document.getElementById('accessDenied').classList.add('active');
+            document.getElementById('accessIcon').innerHTML = icon('user');
+            hydrateIcons(document.getElementById('accessDenied'));
+        }
+
+        async function loadProfile() {
+            try {
+                const profile = await api('/api/user/profile');
+                document.getElementById('adminName').textContent = profile.name || 'Admin';
+                document.getElementById('adminEmail').textContent = profile.email || '';
+            } catch {
+                document.getElementById('adminEmail').textContent = 'Profile unavailable';
+            }
+        }
+
+        async function loadSummary() {
+            const data = await api('/api/admin/summary');
+            state.summary = data;
+            renderSummary();
+            renderRecentAudit();
+        }
+
+        async function loadUsers() {
+            try {
+                const data = await api('/api/admin/users?limit=50');
+                state.users = data.users || [];
+                renderUsers();
+            } catch (err) {
+                showError('usersBody', err.message);
+            }
+        }
+
+        async function loadMeetings() {
+            try {
+                const params = new URLSearchParams({ limit: '50' });
+                const status = document.getElementById('meetingStatus').value;
+                const code = document.getElementById('meetingCode').value.trim();
+                const hostId = document.getElementById('meetingHostId').value.trim();
+                if (status) params.set('status', status);
+                if (code) params.set('code', code);
+                if (hostId) params.set('hostId', hostId);
+                const data = await api('/api/admin/meetings?' + params.toString());
+                state.meetings = data.meetings || [];
+                renderMeetings();
+            } catch (err) {
+                showError('meetingsBody', err.message);
+            }
+        }
+
+        async function loadAuditLogs() {
+            try {
+                const params = new URLSearchParams({ limit: '80' });
+                const meetingCode = document.getElementById('auditMeetingCode').value.trim();
+                const userId = document.getElementById('auditUserId').value.trim();
+                const action = document.getElementById('auditAction').value.trim();
+                if (meetingCode) params.set('meetingCode', meetingCode);
+                if (userId) params.set('userId', userId);
+                if (action) params.set('action', action);
+                const data = await api('/api/admin/audit-logs?' + params.toString());
+                state.auditLogs = data.auditLogs || [];
+                renderAuditLogs();
+            } catch (err) {
+                showError('auditBody', err.message);
+            }
+        }
+
+        function renderSummary() {
+            const totals = state.summary?.totals || {};
+            const metrics = [
+                ['Users', totals.users, 'users'],
+                ['Meetings', totals.meetings, 'video'],
+                ['Active', totals.activeMeetings, 'activity'],
+                ['Scheduled', totals.scheduledMeetings, 'layout'],
+                ['Logs', totals.auditLogs, 'activity'],
+                ['Recordings', totals.recordings, 'video']
+            ];
+
+            document.getElementById('summaryGrid').innerHTML = metrics.map(([label, value, iconName]) => (
+                '<article class="metric">'
+                    + '<div class="metric-top"><span>' + escapeHtml(label) + '</span>' + icon(iconName) + '</div>'
+                    + '<div class="metric-value">' + escapeHtml(value ?? 0) + '</div>'
+                + '</article>'
+            )).join('');
+        }
+
+        function renderRecentAudit() {
+            const logs = state.summary?.recentAuditLogs || [];
+            const body = document.getElementById('recentAuditBody');
+            if (!logs.length) {
+                body.innerHTML = '<tr><td colspan="5" class="empty">No recent audit activity.</td></tr>';
+                return;
+            }
+            body.innerHTML = logs.map((log) => (
+                '<tr>'
+                    + '<td class="mono">' + escapeHtml(formatDate(log.occurredAt)) + '</td>'
+                    + '<td><span class="strong">' + escapeHtml(log.meetingTitle || 'Meeting') + '</span><br><span class="mono muted">' + escapeHtml(log.meetingCode || '') + '</span></td>'
+                    + '<td>' + escapeHtml(log.actorName || 'System') + '</td>'
+                    + '<td><span class="pill">' + escapeHtml(formatAction(log.action)) + '</span></td>'
+                    + '<td>' + escapeHtml(formatDuration(log.durationSeconds)) + '</td>'
+                + '</tr>'
+            )).join('');
+        }
+
+        function renderUsers() {
+            const body = document.getElementById('usersBody');
+            if (!state.users.length) {
+                body.innerHTML = '<tr><td colspan="5" class="empty">No users found.</td></tr>';
+                return;
+            }
+            body.innerHTML = state.users.map((user) => (
+                '<tr>'
+                    + '<td><span class="strong">' + escapeHtml(user.name || 'User') + '</span><br><span class="mono muted">ID ' + escapeHtml(user.id) + '</span></td>'
+                    + '<td><span class="pill">' + escapeHtml(user.authProvider || 'local') + '</span></td>'
+                    + '<td>' + escapeHtml(user.email || '') + '<br><span class="muted">' + (user.emailVerified ? 'Verified' : 'Unverified') + '</span></td>'
+                    + '<td>' + escapeHtml(user.googleCalendarEmail || 'Not connected') + '</td>'
+                    + '<td><span class="pill">' + escapeHtml(user.hostedMeetingCount || 0) + ' hosted</span> <span class="pill">' + escapeHtml(user.joinedMeetingCount || 0) + ' joined</span></td>'
+                + '</tr>'
+            )).join('');
+        }
+
+        function renderMeetings() {
+            const body = document.getElementById('meetingsBody');
+            if (!state.meetings.length) {
+                body.innerHTML = '<tr><td colspan="6" class="empty">No meetings found.</td></tr>';
+                return;
+            }
+            body.innerHTML = state.meetings.map((meeting) => {
+                const status = meetingStatus(meeting);
+                return '<tr>'
+                    + '<td><span class="strong">' + escapeHtml(meeting.title || 'Meeting') + '</span><br><span class="mono muted">' + escapeHtml(meeting.meetingCode || '') + '</span></td>'
+                    + '<td>' + escapeHtml(meeting.hostName || 'Unknown') + '<br><span class="muted">' + escapeHtml(meeting.hostEmail || 'No email') + '</span></td>'
+                    + '<td><span class="pill ' + escapeHtml(status) + '">' + escapeHtml(status) + '</span><br><span class="muted">' + escapeHtml(formatDate(meeting.scheduledTime || meeting.startedAt || meeting.createdAt)) + '</span></td>'
+                    + '<td>' + escapeHtml(formatDuration(meeting.durationSeconds)) + '</td>'
+                    + '<td><span class="pill">' + escapeHtml(meeting.participantCount || 0) + ' participants</span> <span class="pill">' + escapeHtml(meeting.messageCount || 0) + ' messages</span> <span class="pill">' + escapeHtml(meeting.recordingCount || 0) + ' recordings</span></td>'
+                    + '<td><button class="btn" type="button" onclick="openMeetingDetail(' + Number(meeting.id) + ')"><span data-icon="layout"></span>Details</button></td>'
+                + '</tr>';
+            }).join('');
+            hydrateIcons(body);
+        }
+
+        function renderAuditLogs() {
+            const body = document.getElementById('auditBody');
+            if (!state.auditLogs.length) {
+                body.innerHTML = '<tr><td colspan="5" class="empty">No audit logs found.</td></tr>';
+                return;
+            }
+            body.innerHTML = state.auditLogs.map((log) => (
+                '<tr>'
+                    + '<td class="mono">' + escapeHtml(formatDate(log.occurredAt)) + '</td>'
+                    + '<td><span class="strong">' + escapeHtml(log.meetingTitle || 'Meeting') + '</span><br><span class="mono muted">' + escapeHtml(log.meetingCode || '') + '</span></td>'
+                    + '<td>' + escapeHtml(log.userName || log.actorName || 'System') + '<br><span class="muted">' + escapeHtml(log.userEmail || ('ID ' + (log.userId || ''))) + '</span></td>'
+                    + '<td><span class="pill">' + escapeHtml(formatAction(log.action)) + '</span><br><span class="muted">' + escapeHtml(formatDuration(log.durationSeconds)) + '</span></td>'
+                    + '<td>' + escapeHtml(formatDetails(log.details)) + '</td>'
+                + '</tr>'
+            )).join('');
+        }
+
+        async function openMeetingDetail(id) {
+            const modal = document.getElementById('meetingModal');
+            const body = document.getElementById('meetingModalBody');
+            modal.classList.add('active');
+            modal.setAttribute('aria-hidden', 'false');
+            body.innerHTML = '<div class="empty">Loading meeting details...</div>';
+            try {
+                const meeting = await api('/api/admin/meetings/' + encodeURIComponent(id));
+                document.getElementById('meetingModalTitle').textContent = meeting.title || 'Meeting';
+                document.getElementById('meetingModalMeta').textContent = meeting.meetingCode || '';
+                const logs = meeting.auditLogs || [];
+                body.innerHTML =
+                    '<div class="detail-grid">'
+                        + detailCell('Host', (meeting.hostName || 'Unknown') + ' / ' + (meeting.hostEmail || 'No email'))
+                        + detailCell('Status', meetingStatus(meeting))
+                        + detailCell('Duration', formatDuration(meeting.durationSeconds))
+                        + detailCell('Started', formatDate(meeting.startedAt))
+                        + detailCell('Participants', (meeting.participants || []).length)
+                        + detailCell('Messages', (meeting.messages || []).length)
+                        + detailCell('Recordings', (meeting.recordings || []).length)
+                        + detailCell('Created', formatDate(meeting.createdAt))
+                    + '</div>'
+                    + '<div class="panel">'
+                        + '<div class="panel-head"><div><h2>Audit Trail</h2><p>' + logs.length + ' events</p></div></div>'
+                        + '<div class="modal-body stack">'
+                            + (logs.length ? logs.map((log) => (
+                                '<div class="log-line">'
+                                    + '<div><span class="mono muted">' + escapeHtml(formatDate(log.occurredAt)) + '</span></div>'
+                                    + '<div><span class="strong">' + escapeHtml(formatAction(log.action)) + '</span> by ' + escapeHtml(log.actorName || 'System')
+                                    + '<br><span class="muted">' + escapeHtml(formatDetails(log.details)) + '</span></div>'
+                                + '</div>'
+                            )).join('') : '<div class="empty">No audit events recorded.</div>')
+                        + '</div>'
+                    + '</div>';
+            } catch (err) {
+                body.innerHTML = '<div class="error">' + escapeHtml(err.message) + '</div>';
+            }
+        }
+
+        function detailCell(label, value) {
+            return '<div class="detail-cell"><span>' + escapeHtml(label) + '</span><strong>' + escapeHtml(value) + '</strong></div>';
+        }
+
+        function closeMeetingModal() {
+            const modal = document.getElementById('meetingModal');
+            modal.classList.remove('active');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+
+        function setSection(section) {
+            state.section = section;
+            document.querySelectorAll('.section').forEach((el) => el.classList.remove('active'));
+            document.getElementById(section + 'Section').classList.add('active');
+            document.querySelectorAll('.nav button[data-section]').forEach((button) => {
+                button.classList.toggle('active', button.dataset.section === section);
+            });
+            refreshCurrentSection(false);
+        }
+
+        async function refreshCurrentSection(forceSummary = true) {
+            setLoading(true);
+            try {
+                if (forceSummary || !state.summary) await loadSummary();
+                if (state.section === 'meetings') await loadMeetings();
+                if (state.section === 'audit') await loadAuditLogs();
+                if (state.section === 'users') await loadUsers();
+                document.getElementById('lastUpdated').textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            } catch (err) {
+                if (/admin access/i.test(err.message) || /no token|invalid token/i.test(err.message)) {
+                    showAccessDenied();
+                    return;
+                }
+                document.getElementById('lastUpdated').textContent = 'Unable to load admin data';
+                document.getElementById('summaryGrid').innerHTML = '<div class="error">Unable to load admin data.</div>';
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            window.location.href = '/';
+        }
+
+        async function init() {
+            if (!token) {
+                window.location.href = '/';
+                return;
+            }
+            document.getElementById('brandIcon').innerHTML = icon('activity');
+            hydrateIcons();
+            document.querySelectorAll('.nav button[data-section]').forEach((button) => {
+                button.addEventListener('click', () => setSection(button.dataset.section));
+            });
+            await refreshCurrentSection();
+            if (!document.getElementById('accessDenied').classList.contains('active')) {
+                document.getElementById('adminShell').hidden = false;
+                await loadProfile();
+            }
+        }
+
+        window.addEventListener('load', init);
+        window.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') closeMeetingModal();
+        });
+    </script>
+</body>
+</html>

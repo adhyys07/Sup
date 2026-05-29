@@ -946,6 +946,63 @@ const verifyToken = (req, res, next) => {
     }
 };
 
+function envList(name) {
+    return String(process.env[name] || '')
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+}
+
+function parsePositiveInt(value, fallback, max = 100) {
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed) || parsed < 0) return fallback;
+    return Math.min(parsed, max);
+}
+
+function countValue(rows) {
+    return Number(rows?.[0]?.count || rows?.[0]?.total || 0);
+}
+
+function compactWhere(conditions) {
+    const filtered = conditions.filter(Boolean);
+    if (!filtered.length) return null;
+    return filtered.length === 1 ? filtered[0] : and(...filtered);
+}
+
+async function requireAdmin(req, res, next) {
+    try {
+        const adminIds = new Set(envList('ADMIN_USER_IDS').map((id) => Number(id)).filter(Number.isFinite));
+        const adminEmails = new Set(envList('ADMIN_EMAILS').map((email) => email.toLowerCase()));
+
+        if (!adminIds.size && !adminEmails.size) {
+            console.warn('Admin route denied because ADMIN_EMAILS and ADMIN_USER_IDS are not configured.');
+            return res.status(403).json({ error: 'Admin access required' });
+        }
+
+        if (adminIds.has(Number(req.userId))) {
+            req.admin = { id: req.userId };
+            return next();
+        }
+
+        const result = await db.select({
+            id: users.id,
+            email: users.email,
+            name: users.name
+        }).from(users).where(eq(users.id, req.userId));
+
+        const user = result[0];
+        if (!user || !adminEmails.has(String(user.email || '').toLowerCase())) {
+            return res.status(403).json({ error: 'Admin access required' });
+        }
+
+        req.admin = user;
+        next();
+    } catch (err) {
+        console.error('Admin auth error:', err);
+        res.status(500).json({ error: 'Unable to verify admin access' });
+    }
+}
+
 // ============ AUTH ROUTES ============
 app.post('/api/register', authLimiter, async (req, res) => {
     try {
@@ -1418,6 +1475,347 @@ app.post('/api/user/unlink-provider/:provider', verifyToken, async (req, res) =>
         res.json({ message: `${provider} account has been unlinked` });
     } catch (err) {
         console.error('Error unlinking provider:', err);
+        res.status(400).json({ error: err.message });
+    }
+});
+
+// ============ ADMIN ROUTES ============
+app.get('/api/admin/summary', verifyToken, requireAdmin, async (req, res) => {
+    try {
+        await ensureMeetingAuditSchema();
+
+        const now = new Date();
+        const [
+            userCountRows,
+            meetingCountRows,
+            activeMeetingRows,
+            scheduledMeetingRows,
+            auditCountRows,
+            recordingCountRows,
+            messageCountRows
+        ] = await Promise.all([
+            db.select({ count: sql`count(*)` }).from(users),
+            db.select({ count: sql`count(*)` }).from(meetings),
+            db.select({ count: sql`count(*)` }).from(meetings)
+                .where(and(sql`${meetings.startedAt} IS NOT NULL`, sql`${meetings.endedAt} IS NULL`)),
+            db.select({ count: sql`count(*)` }).from(meetings)
+                .where(and(sql`${meetings.scheduledTime} >= ${now}`, sql`${meetings.startedAt} IS NULL`)),
+            db.select({ count: sql`count(*)` }).from(meetingAuditLogs),
+            db.select({ count: sql`count(*)` }).from(recordings),
+            db.select({ count: sql`count(*)` }).from(messages)
+        ]);
+
+        const recentLogs = await db.select({
+            id: meetingAuditLogs.id,
+            meetingId: meetingAuditLogs.meetingId,
+            meetingCode: meetingAuditLogs.meetingCode,
+            actorName: meetingAuditLogs.actorName,
+            action: meetingAuditLogs.action,
+            details: meetingAuditLogs.details,
+            durationSeconds: meetingAuditLogs.durationSeconds,
+            occurredAt: meetingAuditLogs.occurredAt,
+            meetingTitle: meetings.title
+        })
+        .from(meetingAuditLogs)
+        .leftJoin(meetings, eq(meetingAuditLogs.meetingId, meetings.id))
+        .orderBy(desc(meetingAuditLogs.occurredAt))
+        .limit(10);
+
+        res.json({
+            totals: {
+                users: countValue(userCountRows),
+                meetings: countValue(meetingCountRows),
+                activeMeetings: countValue(activeMeetingRows),
+                scheduledMeetings: countValue(scheduledMeetingRows),
+                auditLogs: countValue(auditCountRows),
+                recordings: countValue(recordingCountRows),
+                messages: countValue(messageCountRows)
+            },
+            recentAuditLogs: recentLogs.map((log) => ({
+                ...log,
+                details: parseAuditDetails(log.details)
+            }))
+        });
+    } catch (err) {
+        console.error('Admin summary error:', err);
+        res.status(400).json({ error: err.message });
+    }
+});
+
+app.get('/api/admin/users', verifyToken, requireAdmin, async (req, res) => {
+    try {
+        const limit = parsePositiveInt(req.query.limit, 50, 100);
+        const offset = parsePositiveInt(req.query.offset, 0, 100000);
+
+        const [rows, totalRows] = await Promise.all([
+            db.select({
+                id: users.id,
+                email: users.email,
+                name: users.name,
+                authProvider: users.authProvider,
+                emailVerified: users.emailVerified,
+                googleCalendarEmail: users.googleCalendarEmail,
+                createdAt: users.createdAt,
+                updatedAt: users.updatedAt
+            })
+            .from(users)
+            .orderBy(desc(users.createdAt))
+            .limit(limit)
+            .offset(offset),
+            db.select({ count: sql`count(*)` }).from(users)
+        ]);
+
+        const enriched = await Promise.all(rows.map(async (user) => {
+            const [hostedRows, joinedRows] = await Promise.all([
+                db.select({ count: sql`count(*)` }).from(meetings).where(eq(meetings.hostId, user.id)),
+                db.select({ count: sql`count(*)` }).from(meetingParticipants).where(eq(meetingParticipants.userId, user.id))
+            ]);
+
+            return {
+                ...user,
+                hostedMeetingCount: countValue(hostedRows),
+                joinedMeetingCount: countValue(joinedRows)
+            };
+        }));
+
+        res.json({
+            limit,
+            offset,
+            total: countValue(totalRows),
+            users: enriched
+        });
+    } catch (err) {
+        console.error('Admin users error:', err);
+        res.status(400).json({ error: err.message });
+    }
+});
+
+app.get('/api/admin/meetings', verifyToken, requireAdmin, async (req, res) => {
+    try {
+        const limit = parsePositiveInt(req.query.limit, 50, 100);
+        const offset = parsePositiveInt(req.query.offset, 0, 100000);
+        const hostId = Number.parseInt(req.query.hostId, 10);
+        const status = String(req.query.status || '').toLowerCase();
+        const code = String(req.query.code || '').trim();
+        const now = new Date();
+
+        const conditions = [];
+        if (code) conditions.push(eq(meetings.meetingCode, code));
+        if (Number.isFinite(hostId)) conditions.push(eq(meetings.hostId, hostId));
+        if (status === 'active') {
+            conditions.push(and(sql`${meetings.startedAt} IS NOT NULL`, sql`${meetings.endedAt} IS NULL`));
+        } else if (status === 'ended') {
+            conditions.push(sql`${meetings.endedAt} IS NOT NULL`);
+        } else if (status === 'scheduled') {
+            conditions.push(and(sql`${meetings.scheduledTime} >= ${now}`, sql`${meetings.startedAt} IS NULL`));
+        }
+
+        const whereClause = compactWhere(conditions);
+        const meetingQuery = db.select({
+            id: meetings.id,
+            hostId: meetings.hostId,
+            title: meetings.title,
+            meetingCode: meetings.meetingCode,
+            scheduledTime: meetings.scheduledTime,
+            startedAt: meetings.startedAt,
+            endedAt: meetings.endedAt,
+            isRecording: meetings.isRecording,
+            createdAt: meetings.createdAt,
+            updatedAt: meetings.updatedAt,
+            hostName: users.name,
+            hostEmail: users.email
+        })
+        .from(meetings)
+        .leftJoin(users, eq(meetings.hostId, users.id));
+
+        const countQuery = db.select({ count: sql`count(*)` }).from(meetings);
+        const [rows, totalRows] = await Promise.all([
+            (whereClause ? meetingQuery.where(whereClause) : meetingQuery)
+                .orderBy(desc(meetings.createdAt))
+                .limit(limit)
+                .offset(offset),
+            (whereClause ? countQuery.where(whereClause) : countQuery)
+        ]);
+
+        const enriched = await Promise.all(rows.map(async (meeting) => {
+            const [participantRows, recordingRows, messageRows, auditRows] = await Promise.all([
+                db.select({ count: sql`count(*)` }).from(meetingParticipants).where(eq(meetingParticipants.meetingId, meeting.id)),
+                db.select({ count: sql`count(*)` }).from(recordings).where(eq(recordings.meetingId, meeting.id)),
+                db.select({ count: sql`count(*)` }).from(messages).where(eq(messages.meetingId, meeting.id)),
+                db.select({
+                    id: meetingAuditLogs.id,
+                    action: meetingAuditLogs.action,
+                    actorName: meetingAuditLogs.actorName,
+                    durationSeconds: meetingAuditLogs.durationSeconds,
+                    occurredAt: meetingAuditLogs.occurredAt
+                })
+                .from(meetingAuditLogs)
+                .where(eq(meetingAuditLogs.meetingId, meeting.id))
+                .orderBy(desc(meetingAuditLogs.occurredAt))
+                .limit(1)
+            ]);
+
+            return {
+                ...meeting,
+                durationSeconds: secondsBetween(meeting.startedAt, meeting.endedAt || (meeting.startedAt ? now : null)),
+                participantCount: countValue(participantRows),
+                recordingCount: countValue(recordingRows),
+                messageCount: countValue(messageRows),
+                latestAuditLog: auditRows[0] || null
+            };
+        }));
+
+        res.json({
+            limit,
+            offset,
+            total: countValue(totalRows),
+            meetings: enriched
+        });
+    } catch (err) {
+        console.error('Admin meetings error:', err);
+        res.status(400).json({ error: err.message });
+    }
+});
+
+app.get('/api/admin/meetings/:id', verifyToken, requireAdmin, async (req, res) => {
+    try {
+        await ensureMeetingAuditSchema();
+
+        const meetingId = Number.parseInt(req.params.id, 10);
+        if (!Number.isFinite(meetingId)) {
+            return res.status(400).json({ error: 'Invalid meeting id' });
+        }
+
+        const rows = await db.select({
+            id: meetings.id,
+            hostId: meetings.hostId,
+            title: meetings.title,
+            meetingCode: meetings.meetingCode,
+            scheduledTime: meetings.scheduledTime,
+            startedAt: meetings.startedAt,
+            endedAt: meetings.endedAt,
+            isRecording: meetings.isRecording,
+            createdAt: meetings.createdAt,
+            updatedAt: meetings.updatedAt,
+            hostName: users.name,
+            hostEmail: users.email
+        })
+        .from(meetings)
+        .leftJoin(users, eq(meetings.hostId, users.id))
+        .where(eq(meetings.id, meetingId));
+
+        const meeting = rows[0];
+        if (!meeting) {
+            return res.status(404).json({ error: 'Meeting not found' });
+        }
+
+        const [participantRows, recordingRows, messageRows, auditRows] = await Promise.all([
+            db.select({
+                id: meetingParticipants.id,
+                userId: meetingParticipants.userId,
+                joinedAt: meetingParticipants.joinedAt,
+                leftAt: meetingParticipants.leftAt
+            })
+            .from(meetingParticipants)
+            .where(eq(meetingParticipants.meetingId, meetingId)),
+            db.select({
+                id: recordings.id,
+                recordingUrl: recordings.recordingUrl,
+                duration: recordings.duration,
+                createdAt: recordings.createdAt
+            })
+            .from(recordings)
+            .where(eq(recordings.meetingId, meetingId)),
+            db.select({
+                id: messages.id,
+                userId: messages.userId,
+                message: messages.message,
+                createdAt: messages.createdAt
+            })
+            .from(messages)
+            .where(eq(messages.meetingId, meetingId))
+            .orderBy(desc(messages.createdAt))
+            .limit(100),
+            db.select().from(meetingAuditLogs)
+                .where(eq(meetingAuditLogs.meetingId, meetingId))
+                .orderBy(desc(meetingAuditLogs.occurredAt))
+                .limit(200)
+        ]);
+
+        res.json({
+            ...meeting,
+            durationSeconds: secondsBetween(meeting.startedAt, meeting.endedAt || (meeting.startedAt ? new Date() : null)),
+            participants: participantRows,
+            recordings: recordingRows,
+            messages: messageRows,
+            auditLogs: auditRows.map((log) => ({
+                ...log,
+                details: parseAuditDetails(log.details)
+            }))
+        });
+    } catch (err) {
+        console.error('Admin meeting detail error:', err);
+        res.status(400).json({ error: err.message });
+    }
+});
+
+app.get('/api/admin/audit-logs', verifyToken, requireAdmin, async (req, res) => {
+    try {
+        await ensureMeetingAuditSchema();
+
+        const limit = parsePositiveInt(req.query.limit, 50, 200);
+        const offset = parsePositiveInt(req.query.offset, 0, 100000);
+        const meetingId = Number.parseInt(req.query.meetingId, 10);
+        const userId = Number.parseInt(req.query.userId, 10);
+        const meetingCode = String(req.query.meetingCode || '').trim();
+        const action = String(req.query.action || '').trim();
+
+        const conditions = [];
+        if (Number.isFinite(meetingId)) conditions.push(eq(meetingAuditLogs.meetingId, meetingId));
+        if (Number.isFinite(userId)) conditions.push(eq(meetingAuditLogs.userId, userId));
+        if (meetingCode) conditions.push(eq(meetingAuditLogs.meetingCode, meetingCode));
+        if (action) conditions.push(eq(meetingAuditLogs.action, action));
+
+        const whereClause = compactWhere(conditions);
+        const logQuery = db.select({
+            id: meetingAuditLogs.id,
+            meetingId: meetingAuditLogs.meetingId,
+            meetingCode: meetingAuditLogs.meetingCode,
+            userId: meetingAuditLogs.userId,
+            actorName: meetingAuditLogs.actorName,
+            action: meetingAuditLogs.action,
+            details: meetingAuditLogs.details,
+            durationSeconds: meetingAuditLogs.durationSeconds,
+            occurredAt: meetingAuditLogs.occurredAt,
+            createdAt: meetingAuditLogs.createdAt,
+            meetingTitle: meetings.title,
+            userEmail: users.email,
+            userName: users.name
+        })
+        .from(meetingAuditLogs)
+        .leftJoin(meetings, eq(meetingAuditLogs.meetingId, meetings.id))
+        .leftJoin(users, eq(meetingAuditLogs.userId, users.id));
+
+        const countQuery = db.select({ count: sql`count(*)` }).from(meetingAuditLogs);
+        const [rows, totalRows] = await Promise.all([
+            (whereClause ? logQuery.where(whereClause) : logQuery)
+                .orderBy(desc(meetingAuditLogs.occurredAt))
+                .limit(limit)
+                .offset(offset),
+            (whereClause ? countQuery.where(whereClause) : countQuery)
+        ]);
+
+        res.json({
+            limit,
+            offset,
+            total: countValue(totalRows),
+            auditLogs: rows.map((log) => ({
+                ...log,
+                details: parseAuditDetails(log.details)
+            }))
+        });
+    } catch (err) {
+        console.error('Admin audit logs error:', err);
         res.status(400).json({ error: err.message });
     }
 });
@@ -2469,11 +2867,9 @@ function startServer(port, attempt = 0) {
     });
 }
 
-ensureMeetingAuditSchema()
-    .catch((err) => {
-        console.error('Meeting audit schema check failed:', err);
-        return false;
-    })
-    .finally(() => {
-        startServer(BASE_PORT);
-    });
+startServer(BASE_PORT);
+
+ensureMeetingAuditSchema().catch((err) => {
+    console.error('Meeting audit schema check failed:', err);
+    return false;
+});
