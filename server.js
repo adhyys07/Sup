@@ -42,6 +42,7 @@ const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const GITHUB_OAUTH_SCOPES = ['user:email', 'repo'];
 const TEMP_ATTACHMENTS_DIR = path.join(process.cwd(), 'temp', 'meeting-attachments');
 const MEETING_RECORDINGS_DIR = path.join(process.cwd(), 'storage', 'meeting-recordings');
+const CLIENT_DIST_DIR = path.join(process.cwd(), 'client', 'dist');
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 const MAX_RECORDING_BYTES = 300 * 1024 * 1024;
 
@@ -87,6 +88,13 @@ const authLimiter = ratelimit({
 });
 
 app.use('/api/', apiLimiter);
+
+if (fs.existsSync(CLIENT_DIST_DIR)) {
+    app.use('/app', express.static(CLIENT_DIST_DIR));
+    app.get('/app/*', (req, res) => {
+        res.sendFile(path.join(CLIENT_DIST_DIR, 'index.html'));
+    });
+}
 
 // Helper function to send verification email
 async function sendVerificationEmail(email, name, token) {

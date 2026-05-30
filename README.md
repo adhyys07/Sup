@@ -16,6 +16,8 @@ Sup! is a full-stack video meeting workspace built for innovators, it has variou
 - Meeting recordings with optional Google Drive/GitHub sync
 - Google Calendar and ICS support
 - Past meeting audit logs with durations and activity history
+- Admin APIs and dashboards for global users, meetings, and audit logs
+- React + TypeScript migration started under `client/`
 
 ## Stack
 
@@ -23,6 +25,7 @@ Sup! is a full-stack video meeting workspace built for innovators, it has variou
 - PostgreSQL, Drizzle ORM
 - JWT, bcryptjs, Passport
 - WebRTC
+- React, TypeScript, Vite
 - Multer, Nodemailer
 - Three.js, HTML, CSS, vanilla JS
 
@@ -63,16 +66,22 @@ npm run dev
 
 Open `http://localhost:3000`.
 
+React client:
+
+```bash
+npm install --prefix client
+npm run client:dev
+npm run client:build
+```
+
 ## Optional Env
 
 Email:
 
 ```env
-SMTP_HOST=
-SMTP_PORT=587
-SMTP_USER=
-SMTP_PASS=
-SMTP_FROM=
+EMAIL_SERVICE=gmail
+EMAIL_USER=
+EMAIL_PASSWORD=
 ```
 
 OAuth:
@@ -86,6 +95,16 @@ GITHUB_CLIENT_ID=
 GITHUB_CLIENT_SECRET=
 GITHUB_CALLBACK_URL=http://localhost:3000/auth/github/callback
 GITHUB_RECORDINGS_REPO=username/repo
+GITHUB_RECORDINGS_BRANCH=main
+
+GOOGLE_DRIVE_RECORDINGS_FOLDER_ID=
+```
+
+Admin:
+
+```env
+ADMIN_EMAILS=owner@example.com
+ADMIN_USER_IDS=1
 ```
 
 ## Scripts
@@ -93,6 +112,8 @@ GITHUB_RECORDINGS_REPO=username/repo
 ```bash
 npm start       # start server
 npm run dev     # start with nodemon
+npm run client:dev
+npm run client:build
 npm run db:push # push Drizzle schema
 npm run db:studio
 ```
@@ -101,15 +122,19 @@ npm run db:studio
 
 - `/` - login/register
 - `/dashboard.html` - meetings and audit history
+- `/app/dashboard` - React dashboard after `npm run client:build`
+- `/admin.html` - legacy admin dashboard
+- `/app/admin` - React admin dashboard after `npm run client:build`
 - `/profile.html` - profile and account connections
 - `/meeting.html?room=CODE` - meeting room
 - `/join/:code` - shareable join link
+- `/api/admin/*` - admin-only JSON APIs
 
 ## Notes
 
 - Node.js 18.x is expected.
 - Run `node scripts/db-backfill.js` after pulling schema changes.
-- Audit logs require the `meeting_audit_logs` table from the backfill.
+- Audit logs use `meeting_audit_logs`; the server creates it on startup if needed.
 - Camera/mic access requires `localhost` or HTTPS.
 - Keep `.env` out of git.
 

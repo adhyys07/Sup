@@ -1636,24 +1636,26 @@
 
         /* Complete meeting-room makeover */
         :root {
-            --call-bg: #070a0f;
-            --call-surface: rgba(12, 16, 24, 0.84);
-            --call-surface-2: rgba(18, 24, 34, 0.72);
-            --call-line: rgba(230, 238, 246, 0.12);
+            --call-bg: #07111f;
+            --call-surface: rgba(10, 24, 42, 0.82);
+            --call-surface-2: rgba(14, 36, 58, 0.72);
+            --call-line: rgba(222, 244, 255, 0.16);
             --call-text: #f7fbff;
-            --call-muted: #9aa8b8;
-            --call-accent: #2dd4bf;
-            --call-accent-2: #7c8cff;
-            --call-warn: #d6a044;
-            --call-danger: #ef4f5f;
+            --call-muted: #b9d0e4;
+            --call-accent: #22d3ee;
+            --call-accent-2: #60a5fa;
+            --call-accent-3: #34d399;
+            --call-warn: #fbbf24;
+            --call-danger: #fb4d6d;
         }
 
         body {
             background:
-                radial-gradient(circle at 50% 0%, rgba(124, 140, 255, 0.12), transparent 34%),
-                radial-gradient(circle at 0% 28%, rgba(45, 212, 191, 0.12), transparent 28%),
-                radial-gradient(circle at 100% 70%, rgba(214, 160, 68, 0.1), transparent 30%),
-                linear-gradient(135deg, #070a0f 0%, #0d121a 48%, #0a0c12 100%);
+                radial-gradient(circle at 48% -8%, rgba(96, 165, 250, 0.24), transparent 34%),
+                radial-gradient(circle at 0% 28%, rgba(34, 211, 238, 0.22), transparent 30%),
+                radial-gradient(circle at 100% 72%, rgba(251, 191, 36, 0.16), transparent 30%),
+                radial-gradient(circle at 82% 18%, rgba(52, 211, 153, 0.14), transparent 24%),
+                linear-gradient(135deg, #081624 0%, #0b2542 45%, #102a43 100%);
             color: var(--call-text);
         }
 
@@ -1666,16 +1668,16 @@
         }
 
         body::after {
-            background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent 26%, rgba(0, 0, 0, 0.24));
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), transparent 28%, rgba(2, 8, 23, 0.2));
             opacity: 1;
         }
 
         .header {
             height: 68px;
             padding: 0 22px;
-            background: rgba(7, 10, 15, 0.82);
+            background: rgba(7, 19, 34, 0.78);
             border-bottom: 1px solid var(--call-line);
-            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+            box-shadow: 0 10px 28px rgba(2, 8, 23, 0.24);
         }
 
         .header-left h1 {
@@ -1688,20 +1690,23 @@
         .btn-toggle {
             min-height: 38px;
             border-radius: 10px;
-            background: rgba(255, 255, 255, 0.07);
+            background: rgba(255, 255, 255, 0.1);
             border: 1px solid var(--call-line);
-            color: #eaf1f8;
+            color: #f1f8ff;
         }
 
         .meeting-code {
             padding: 9px 12px;
+            color: #fde68a;
+            background: rgba(251, 191, 36, 0.14);
+            border-color: rgba(251, 191, 36, 0.24);
         }
 
         .btn-leave {
             border-radius: 999px;
             padding: 11px 20px;
-            background: linear-gradient(135deg, #ef4f5f, #c73344);
-            box-shadow: 0 14px 26px rgba(239, 79, 95, 0.22);
+            background: linear-gradient(135deg, #ff5f7e, #dc2f55);
+            box-shadow: 0 14px 26px rgba(251, 77, 109, 0.28);
         }
 
         .main-content {
@@ -1712,10 +1717,12 @@
         .video-section,
         .chat-section,
         .tools-section {
-            background: linear-gradient(180deg, rgba(17, 23, 33, 0.84), rgba(10, 14, 21, 0.88));
+            background:
+                linear-gradient(180deg, rgba(12, 33, 55, 0.84), rgba(7, 18, 32, 0.88)),
+                radial-gradient(circle at top left, rgba(34, 211, 238, 0.1), transparent 34%);
             border: 1px solid var(--call-line);
             border-radius: 16px;
-            box-shadow: 0 28px 68px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+            box-shadow: 0 28px 68px rgba(2, 8, 23, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.08);
         }
 
         .videos-container {
@@ -1725,12 +1732,12 @@
 
         .video-wrapper {
             border-radius: 14px;
-            border: 1px solid rgba(230, 238, 246, 0.12);
+            border: 1px solid rgba(222, 244, 255, 0.16);
             background:
-                radial-gradient(circle at 24% 24%, rgba(45, 212, 191, 0.1), transparent 34%),
-                radial-gradient(circle at 74% 72%, rgba(124, 140, 255, 0.1), transparent 38%),
-                linear-gradient(145deg, #141a25, #0a0f16);
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 18px 42px rgba(0, 0, 0, 0.3);
+                radial-gradient(circle at 24% 24%, rgba(34, 211, 238, 0.16), transparent 34%),
+                radial-gradient(circle at 74% 72%, rgba(96, 165, 250, 0.16), transparent 38%),
+                linear-gradient(145deg, #14253a, #071322);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 18px 42px rgba(2, 8, 23, 0.28);
         }
 
         .video-label {
@@ -1738,18 +1745,18 @@
             left: 14px;
             padding: 8px 12px;
             border-radius: 999px;
-            background: rgba(7, 10, 15, 0.68);
-            border: 1px solid rgba(255, 255, 255, 0.14);
+            background: rgba(7, 19, 34, 0.72);
+            border: 1px solid rgba(255, 255, 255, 0.18);
             backdrop-filter: blur(10px);
             font-size: 12px;
         }
 
         .camera-off {
             background:
-                radial-gradient(circle at 50% 38%, rgba(255, 255, 255, 0.08), transparent 20%),
-                radial-gradient(circle at 24% 18%, rgba(45, 212, 191, 0.13), transparent 34%),
-                radial-gradient(circle at 76% 80%, rgba(124, 140, 255, 0.13), transparent 40%),
-                linear-gradient(145deg, #151b26, #0b1018) !important;
+                radial-gradient(circle at 50% 38%, rgba(255, 255, 255, 0.1), transparent 20%),
+                radial-gradient(circle at 24% 18%, rgba(34, 211, 238, 0.18), transparent 34%),
+                radial-gradient(circle at 76% 80%, rgba(96, 165, 250, 0.18), transparent 40%),
+                linear-gradient(145deg, #152941, #091827) !important;
         }
 
         .camera-avatar {
@@ -1771,7 +1778,7 @@
             padding: 16px 18px;
             color: var(--call-text);
             border-bottom: 1px solid var(--call-line);
-            background: rgba(255, 255, 255, 0.035);
+            background: rgba(255, 255, 255, 0.06);
             font-size: 14px;
             font-weight: 900;
         }
@@ -1786,8 +1793,8 @@
         .check-item,
         .transcript-box {
             border-radius: 12px;
-            background: rgba(255, 255, 255, 0.06);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.085);
+            border: 1px solid rgba(255, 255, 255, 0.14);
         }
 
         .tool-title {
@@ -1800,8 +1807,8 @@
         .tool-textarea,
         .chat-input input {
             border-radius: 10px;
-            background: rgba(7, 10, 15, 0.58);
-            border-color: rgba(255, 255, 255, 0.12);
+            background: rgba(7, 19, 34, 0.58);
+            border-color: rgba(222, 244, 255, 0.16);
         }
 
         .call-controls {
@@ -1810,10 +1817,12 @@
             height: 76px;
             padding: 10px 16px;
             border-radius: 22px;
-            background: rgba(7, 10, 15, 0.84);
-            border: 1px solid rgba(230, 238, 246, 0.14);
-            box-shadow: 0 26px 58px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.07);
-            backdrop-filter: blur(20px) saturate(1.08);
+            background:
+                linear-gradient(135deg, rgba(8, 30, 52, 0.88), rgba(7, 19, 34, 0.86)),
+                radial-gradient(circle at 18% 10%, rgba(34, 211, 238, 0.16), transparent 38%);
+            border: 1px solid rgba(222, 244, 255, 0.18);
+            box-shadow: 0 26px 58px rgba(2, 8, 23, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.09);
+            backdrop-filter: blur(20px) saturate(1.22);
         }
 
         .call-controls button,
@@ -1821,26 +1830,27 @@
             width: 52px;
             height: 52px;
             border-radius: 16px;
-            background: rgba(255, 255, 255, 0.07);
-            border: 1px solid rgba(230, 238, 246, 0.14);
+            background: rgba(255, 255, 255, 0.105);
+            border: 1px solid rgba(222, 244, 255, 0.18);
             box-shadow: none;
         }
 
         .call-controls .ctrl-on,
         .lobby-controls .ctrl-on {
-            background: linear-gradient(135deg, rgba(45, 212, 191, 0.95), rgba(62, 133, 218, 0.95)) !important;
-            border-color: rgba(169, 243, 232, 0.32);
+            background: linear-gradient(135deg, rgba(34, 211, 238, 0.98), rgba(52, 211, 153, 0.94), rgba(96, 165, 250, 0.96)) !important;
+            border-color: rgba(186, 247, 255, 0.42);
+            box-shadow: 0 12px 26px rgba(34, 211, 238, 0.22);
         }
 
         .call-controls .ctrl-off,
         .lobby-controls .ctrl-off,
         #recordBtn.ctrl-off {
-            background: linear-gradient(135deg, rgba(239, 79, 95, 0.96), rgba(194, 51, 68, 0.96)) !important;
+            background: linear-gradient(135deg, rgba(251, 77, 109, 0.98), rgba(220, 47, 85, 0.96)) !important;
             border-color: rgba(255, 205, 211, 0.34);
         }
 
         #saveDriveBtn.btn-toggle {
-            background: rgba(255, 255, 255, 0.055);
+            background: rgba(255, 255, 255, 0.085);
         }
 
         .icon-svg {
@@ -1856,8 +1866,8 @@
             height: 18px;
             padding: 0;
             border-radius: 999px;
-            background: rgba(214, 160, 68, 0.18);
-            color: #ffd989;
+            background: rgba(251, 191, 36, 0.22);
+            color: #fde68a;
         }
 
         .raised-hand-chip .icon-svg {
@@ -1867,8 +1877,10 @@
 
         .lobby-card {
             border-radius: 18px;
-            background: linear-gradient(160deg, rgba(18, 24, 34, 0.92), rgba(10, 14, 21, 0.92));
-            border-color: rgba(230, 238, 246, 0.14);
+            background:
+                linear-gradient(160deg, rgba(12, 33, 55, 0.92), rgba(7, 19, 34, 0.92)),
+                radial-gradient(circle at top left, rgba(34, 211, 238, 0.14), transparent 34%);
+            border-color: rgba(222, 244, 255, 0.18);
         }
 
         .lobby-preview {
@@ -1877,9 +1889,10 @@
 
         body.light-mode {
             background:
-                radial-gradient(circle at 10% 18%, rgba(45, 212, 191, 0.13), transparent 30%),
-                radial-gradient(circle at 86% 14%, rgba(124, 140, 255, 0.12), transparent 28%),
-                linear-gradient(135deg, #f8fbff, #e9f0f7 52%, #f5f2ec);
+                radial-gradient(circle at 10% 18%, rgba(34, 211, 238, 0.2), transparent 30%),
+                radial-gradient(circle at 86% 14%, rgba(96, 165, 250, 0.18), transparent 28%),
+                radial-gradient(circle at 72% 84%, rgba(251, 191, 36, 0.14), transparent 26%),
+                linear-gradient(135deg, #fbfdff, #e8f7ff 48%, #effdf7);
         }
 
         body.light-mode .video-section,
@@ -1888,15 +1901,15 @@
         body.light-mode .call-controls,
         body.light-mode .header {
             background: rgba(255, 255, 255, 0.84);
-            border-color: rgba(15, 23, 42, 0.11);
-            box-shadow: 0 24px 52px rgba(15, 23, 42, 0.12);
+            border-color: rgba(14, 116, 144, 0.14);
+            box-shadow: 0 24px 52px rgba(15, 23, 42, 0.1);
         }
 
         body.light-mode .video-wrapper {
             background:
-                radial-gradient(circle at 24% 24%, rgba(45, 212, 191, 0.1), transparent 34%),
-                radial-gradient(circle at 74% 72%, rgba(124, 140, 255, 0.1), transparent 38%),
-                linear-gradient(145deg, #f8fbff, #e8eef6);
+                radial-gradient(circle at 24% 24%, rgba(34, 211, 238, 0.14), transparent 34%),
+                radial-gradient(circle at 74% 72%, rgba(96, 165, 250, 0.14), transparent 38%),
+                linear-gradient(145deg, #fbfdff, #e7f3ff);
         }
 
         @media (max-width: 760px) {
