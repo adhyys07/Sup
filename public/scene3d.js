@@ -4,8 +4,13 @@ const stage = document.querySelector('.sup-3d-stage');
 
 if (stage) {
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    const lowPowerDevice = navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4;
+    const renderer = new THREE.WebGLRenderer({
+        antialias: !lowPowerDevice,
+        alpha: true,
+        powerPreference: 'low-power'
+    });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, lowPowerDevice ? 1 : 1.5));
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     stage.appendChild(renderer.domElement);
@@ -53,12 +58,12 @@ if (stage) {
         })
     };
 
-    const torus = new THREE.Mesh(new THREE.TorusGeometry(1.42, 0.22, 32, 96), materials.blue);
+    const torus = new THREE.Mesh(new THREE.TorusGeometry(1.42, 0.22, 18, 56), materials.blue);
     torus.position.set(-3.2, 1.12, -1.4);
     torus.rotation.set(0.82, 0.2, -0.28);
     rig.add(torus);
 
-    const knot = new THREE.Mesh(new THREE.TorusKnotGeometry(0.72, 0.18, 128, 18), materials.cyan);
+    const knot = new THREE.Mesh(new THREE.TorusKnotGeometry(0.72, 0.18, 72, 12), materials.cyan);
     knot.position.set(3.25, -0.76, -0.9);
     knot.rotation.set(0.35, -0.4, 0.2);
     rig.add(knot);
@@ -87,7 +92,7 @@ if (stage) {
     ];
     const curve = new THREE.CatmullRomCurve3(curvePoints);
     const line = new THREE.Line(
-        new THREE.BufferGeometry().setFromPoints(curve.getPoints(80)),
+        new THREE.BufferGeometry().setFromPoints(curve.getPoints(36)),
         materials.line
     );
     rig.add(line);
@@ -101,13 +106,33 @@ if (stage) {
         pointerY = (event.clientY / window.innerHeight - 0.5) * 0.28;
     }, { passive: true });
 
-    window.addEventListener('resize', () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
+    let resizeTimer = null;
+    function syncRendererSize() {
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+        camera.aspect = width / height;
         camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setSize(width, height);
+    }
+
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+            syncRendererSize();
+            render();
+        }, 120);
     });
 
+    let frameId = 0;
+    let running = false;
+
     function render() {
+        if (document.hidden) {
+            running = false;
+            frameId = 0;
+            return;
+        }
+
         const t = clock.getElapsedTime();
         const motion = prefersReducedMotion ? 0 : t;
 
@@ -122,9 +147,25 @@ if (stage) {
         renderer.render(scene, camera);
 
         if (!prefersReducedMotion) {
-            requestAnimationFrame(render);
+            frameId = requestAnimationFrame(render);
         }
     }
 
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            running = false;
+            if (frameId) cancelAnimationFrame(frameId);
+            frameId = 0;
+            return;
+        }
+        if (!running && !prefersReducedMotion) {
+            running = true;
+            frameId = requestAnimationFrame(render);
+        } else {
+            render();
+        }
+    });
+
+    running = true;
     render();
 }

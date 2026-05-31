@@ -738,7 +738,18 @@
         </div>
     </div>
 
-    <script type="module" src="/scene3d.js"></script>
+    <script>
+        (() => {
+            const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+            const shouldSkip3d = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+                || window.matchMedia('(max-width: 760px)').matches
+                || Boolean(connection && connection.saveData);
+            if (shouldSkip3d) return;
+            const load3d = () => import('/scene3d.js');
+            if ('requestIdleCallback' in window) window.requestIdleCallback(load3d, { timeout: 1500 });
+            else window.setTimeout(load3d, 900);
+        })();
+    </script>
     <script>
         const token = localStorage.getItem('token');
         if (!token) {
@@ -755,15 +766,30 @@
             const initial = (name || 'U').charAt(0).toUpperCase();
             el.textContent = initial;
             el.style.backgroundImage = '';
+            el.style.color = 'white';
+            delete el.dataset.avatarUrl;
 
-            if (avatarUrl) {
-                el.style.backgroundImage = `url('${avatarUrl.replace(/'/g, "%27")}')`;
+            if (!avatarUrl) return;
+
+            const safeUrl = String(avatarUrl).trim();
+            if (!safeUrl) return;
+
+            el.dataset.avatarUrl = safeUrl;
+            const img = new Image();
+            img.referrerPolicy = 'no-referrer';
+            img.onload = () => {
+                if (el.dataset.avatarUrl !== safeUrl) return;
+                el.style.backgroundImage = `url("${safeUrl.replace(/"/g, '%22')}")`;
                 el.style.backgroundSize = 'cover';
                 el.style.backgroundPosition = 'center';
                 el.style.color = 'transparent';
-            } else {
+            };
+            img.onerror = () => {
+                if (el.dataset.avatarUrl !== safeUrl) return;
+                el.style.backgroundImage = '';
                 el.style.color = 'white';
-            }
+            };
+            img.src = safeUrl;
         }
 
         // Initialize dashboard

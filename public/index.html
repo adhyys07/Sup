@@ -411,7 +411,18 @@
         </div>
     </div>
 
-    <script type="module" src="/scene3d.js"></script>
+    <script>
+        (() => {
+            const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+            const shouldSkip3d = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+                || window.matchMedia('(max-width: 760px)').matches
+                || Boolean(connection && connection.saveData);
+            if (shouldSkip3d) return;
+            const load3d = () => import('/scene3d.js');
+            if ('requestIdleCallback' in window) window.requestIdleCallback(load3d, { timeout: 1500 });
+            else window.setTimeout(load3d, 900);
+        })();
+    </script>
     <script>
         // Check if token exists
         const token = localStorage.getItem('token');

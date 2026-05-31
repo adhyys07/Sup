@@ -27,12 +27,27 @@ const io = new Server(server, {
     cors: { origin: '*' }
 });
 
+const staticAssetOptions = {
+    etag: true,
+    maxAge: '1h',
+    setHeaders(res, filePath) {
+        if (filePath.endsWith('.html')) {
+            res.setHeader('Cache-Control', 'no-cache');
+            return;
+        }
+
+        if (filePath.includes(`${path.sep}vendor${path.sep}`) || /\.(js|css|woff2?)$/i.test(filePath)) {
+            res.setHeader('Cache-Control', 'public, max-age=604800');
+        }
+    }
+};
+
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.set('trust proxy', 1);
 app.use(passport.initialize());
-app.use(express.static('public'));
+app.use(express.static('public', staticAssetOptions));
 
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
 
@@ -90,7 +105,7 @@ const authLimiter = ratelimit({
 app.use('/api/', apiLimiter);
 
 if (fs.existsSync(CLIENT_DIST_DIR)) {
-    app.use('/app', express.static(CLIENT_DIST_DIR));
+    app.use('/app', express.static(CLIENT_DIST_DIR, staticAssetOptions));
     app.get('/app/*', (req, res) => {
         res.sendFile(path.join(CLIENT_DIST_DIR, 'index.html'));
     });
@@ -213,6 +228,21 @@ function parseAuditDetails(details) {
     } catch {
         return details;
     }
+}
+
+function getProfileAvatar(profile) {
+    return profile?.photos?.[0]?.value || null;
+}
+
+async function syncUserAvatarIfMissing(user, avatar) {
+    if (!user?.id || !avatar || user.avatar) return user;
+
+    const updated = await db.update(users)
+        .set({ avatar, updatedAt: new Date() })
+        .where(eq(users.id, user.id))
+        .returning();
+
+    return updated[0] || { ...user, avatar };
 }
 
 let meetingAuditSchemaReady = false;
@@ -636,6 +666,7 @@ async function uploadRecordingToLinkedGitHub(userId, roomCode, localFilePath, lo
 async function findOrCreateOAuthUser(profile, provider, linkingInfo = null, oauthData = {}) {
     const providerId = String(profile.id);
     const email = profile.emails?.[0]?.value || null;
+    const avatar = getProfileAvatar(profile);
     const providerDisplayName = provider === 'github'
         ? (profile.username || profile.displayName || email || `github-${providerId}`)
         : (profile.displayName || email);
@@ -651,13 +682,13 @@ async function findOrCreateOAuthUser(profile, provider, linkingInfo = null, oaut
             await db.update(oauthConnections)
                 .set({
                     displayName: providerDisplayName,
-                    avatar: profile.photos?.[0]?.value || null,
+                    avatar,
                     updatedAt: new Date()
                 })
                 .where(eq(oauthConnections.id, oauthRow.id));
 
             const linkedUser = await db.select().from(users).where(eq(users.id, oauthRow.userId));
-            if (linkedUser.length > 0) return linkedUser[0];
+            if (linkedUser.length > 0) return await syncUserAvatarIfMissing(linkedUser[0], avatar);
         }
     }
 
@@ -681,7 +712,7 @@ async function findOrCreateOAuthUser(profile, provider, linkingInfo = null, oaut
                         providerId,
                         email: email || linkedUser[0].email || null,
                         displayName: providerDisplayName,
-                        avatar: profile.photos?.[0]?.value || null,
+                        avatar,
                         githubAccessToken: provider === 'github' ? (oauthData.accessToken || existingOAuth[0].githubAccessToken || null) : existingOAuth[0].githubAccessToken,
                         updatedAt: new Date()
                     })
@@ -694,12 +725,12 @@ async function findOrCreateOAuthUser(profile, provider, linkingInfo = null, oaut
                     providerId,
                     email: email || linkedUser[0].email || null,
                     displayName: providerDisplayName,
-                    avatar: profile.photos?.[0]?.value || null,
+                    avatar,
                     githubAccessToken: provider === 'github' ? (oauthData.accessToken || null) : null
                 });
             }
             
-            return linkedUser[0];
+            return await syncUserAvatarIfMissing(linkedUser[0], avatar);
         } else {
             throw new Error('User not found for linking');
         }
@@ -718,7 +749,7 @@ async function findOrCreateOAuthUser(profile, provider, linkingInfo = null, oaut
                     providerId,
                     email: email || existingUser.email || null,
                     displayName: providerDisplayName,
-                    avatar: profile.photos?.[0]?.value || null,
+                    avatar,
                     githubAccessToken: provider === 'github' ? (oauthData.accessToken || existingOAuth[0].githubAccessToken || null) : existingOAuth[0].githubAccessToken,
                     updatedAt: new Date()
                 })
@@ -730,12 +761,12 @@ async function findOrCreateOAuthUser(profile, provider, linkingInfo = null, oaut
                 providerId,
                 email: email || existingUser.email || null,
                 displayName: providerDisplayName,
-                avatar: profile.photos?.[0]?.value || null,
+                avatar,
                 githubAccessToken: provider === 'github' ? (oauthData.accessToken || null) : null
             });
         }
 
-        return existingUser;
+        return await syncUserAvatarIfMissing(existingUser, avatar);
     }
 
     // New local user record cannot be created without email.
@@ -747,7 +778,7 @@ async function findOrCreateOAuthUser(profile, provider, linkingInfo = null, oaut
     const result = await db.insert(users).values({
         email,
         name: profile.displayName || email,
-        avatar: profile.photos?.[0]?.value || null,
+        avatar,
         authProvider: provider,
         authProviderId: providerId,
         emailVerified: true  // OAuth users are auto-verified
@@ -761,7 +792,7 @@ async function findOrCreateOAuthUser(profile, provider, linkingInfo = null, oaut
             providerId,
             email,
             displayName: providerDisplayName,
-            avatar: profile.photos?.[0]?.value || null,
+            avatar,
             githubAccessToken: provider === 'github' ? (oauthData.accessToken || null) : null
         });
     }
@@ -1256,12 +1287,27 @@ app.get('/api/user/profile', verifyToken, async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
 
+        let avatar = result[0].avatar;
+        if (!avatar) {
+            try {
+                const oauthRows = await db.select({ avatar: oauthConnections.avatar })
+                    .from(oauthConnections)
+                    .where(eq(oauthConnections.userId, req.userId));
+                avatar = oauthRows.find((row) => row.avatar)?.avatar || null;
+                if (avatar) {
+                    await syncUserAvatarIfMissing(result[0], avatar);
+                }
+            } catch (avatarErr) {
+                console.warn('Unable to load OAuth avatar fallback:', avatarErr?.message || avatarErr);
+            }
+        }
+
         res.json({
             id: result[0].id,
             email: result[0].email,
             name: result[0].name,
             bio: result[0].bio,
-            avatar: result[0].avatar,
+            avatar,
             googleCalendarEmail: result[0].googleCalendarEmail,
             googleCalendarConnected: !!result[0].googleCalendarRefreshToken
         });
