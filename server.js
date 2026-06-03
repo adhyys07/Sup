@@ -54,7 +54,7 @@ const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this';
 const GOOGLE_CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
 const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
-const GITHUB_OAUTH_SCOPES = ['user:email', 'repo'];
+const GITHUB_OAUTH_SCOPES = ['user:email'];
 const TEMP_ATTACHMENTS_DIR = path.join(process.cwd(), 'temp', 'meeting-attachments');
 const MEETING_RECORDINGS_DIR = path.join(process.cwd(), 'storage', 'meeting-recordings');
 const CLIENT_DIST_DIR = path.join(process.cwd(), 'client', 'dist');
@@ -118,7 +118,7 @@ async function sendVerificationEmail(email, name, token) {
         return false;
     }
 
-    const verificationUrl = `${BASE_URL}/verify-email?token=${token}`;
+    const verificationUrl = `${BASE_URL}/verify-email.html?token=${token}`;
     const mailOptions = {
         from: `"Sup" <${process.env.EMAIL_USER}>`,
         to: email,
@@ -1173,6 +1173,13 @@ app.post('/api/login', authLimiter, async (req, res) => {
     } catch (err) {
         res.status(400).json({ error: err.message });
     }
+});
+
+// Keep older verification emails working if they point to /verify-email.
+app.get('/verify-email', (req, res) => {
+    const token = typeof req.query.token === 'string' ? req.query.token : '';
+    const query = token ? `?token=${encodeURIComponent(token)}` : '';
+    res.redirect(`/verify-email.html${query}`);
 });
 
 // Verify email endpoint
