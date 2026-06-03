@@ -113,9 +113,14 @@ if (fs.existsSync(CLIENT_DIST_DIR)) {
 
 // Helper function to send verification email
 async function sendVerificationEmail(email, name, token) {
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
+        console.error('Email verification is not configured. Set EMAIL_USER and EMAIL_PASSWORD.');
+        return false;
+    }
+
     const verificationUrl = `${BASE_URL}/verify-email?token=${token}`;
     const mailOptions = {
-        from: process.env.EMAIL_USER || 'noreply@sup.app',
+        from: `"Sup" <${process.env.EMAIL_USER}>`,
         to: email,
         subject: 'Verify your Sup account',
         html: `
@@ -129,7 +134,26 @@ async function sendVerificationEmail(email, name, token) {
     };
 
     try {
-        await emailTransporter.sendMail(mailOptions);
+        const info = await emailTransporter.sendMail(mailOptions);
+        const accepted = Array.isArray(info.accepted) ? info.accepted.map((item) => String(item).toLowerCase()) : [];
+        const rejected = Array.isArray(info.rejected) ? info.rejected : [];
+        const target = String(email).toLowerCase();
+
+        if (!accepted.includes(target)) {
+            console.error('Verification email was not accepted by the provider:', {
+                to: email,
+                accepted: info.accepted,
+                rejected,
+                response: info.response
+            });
+            return false;
+        }
+
+        console.log('Verification email accepted:', {
+            to: email,
+            messageId: info.messageId,
+            response: info.response
+        });
         return true;
     } catch (error) {
         console.error('Error sending verification email:', error);
@@ -1092,14 +1116,14 @@ app.post('/api/register', authLimiter, async (req, res) => {
         // Send verification email
         const emailSent = await sendVerificationEmail(email, name, verificationToken);
 
-        if (!emailSent && process.env.EMAIL_USER) {
-            // If email fails to send and email is configured, delete the user
+        if (!emailSent) {
+            // If email fails to send, delete the unverified user so the user can retry cleanly.
             await db.delete(users).where(eq(users.id, result[0].id));
             return res.status(500).json({ error: 'Failed to send verification email. Please try again.' });
         }
 
         res.status(201).json({ 
-            message: 'Account created! Please check your email to verify your address.',
+            message: 'Account created. Verification email sent. Please check your inbox.',
             email: email
         });
     } catch (err) {

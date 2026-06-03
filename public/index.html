@@ -486,12 +486,13 @@
                 // Show success message for email verification
                 errorDiv.style.display = 'none';
                 const registerForm = document.getElementById('registerForm');
+                const successMessage = data.message || `A verification link has been sent to <strong>${email}</strong>.`;
                 registerForm.innerHTML = `
                     <div style="text-align: center; padding: 40px 0;">
                         <div style="font-size: 48px; margin-bottom: 20px;">📧</div>
                         <h2 style="margin-bottom: 15px;">Verify Your Email</h2>
                         <p style="color: var(--muted); margin-bottom: 20px; line-height: 1.5;">
-                            A verification link has been sent to <strong>${email}</strong>.
+                            ${successMessage}
                             Please check your inbox and click the link to verify your email address.
                         </p>
                         <p style="color: var(--muted); font-size: 14px; margin-bottom: 30px;">
