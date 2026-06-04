@@ -1622,6 +1622,19 @@ body {
             }
         }
 
+        function setRemoteUserName(id, name) {
+            const displayName = (name || '').trim();
+            if (!id || !displayName) return;
+
+            userNames[id] = displayName;
+            const tile = document.getElementById(`tile-${id}`);
+            if (!tile) return;
+
+            const label = tile.querySelector('.video-label');
+            if (label) label.textContent = displayName;
+            setTileCameraState(`tile-${id}`, displayName, !!remoteCameraOff[id]);
+        }
+
         // ============ LOBBY ============
         async function initLobby() {
             try {
@@ -2032,7 +2045,7 @@ body {
         // ============ WEBRTC ============
         socket.on("user-joined", async (id, name) => {
             console.log("User joined:", id, name);
-            if (name) userNames[id] = name;
+            setRemoteUserName(id, name);
             const pc = createPeerConnection(id);
             peerConnections[id] = pc;
             
@@ -2045,7 +2058,14 @@ body {
             });
         });
 
+        socket.on('room-participants', (participants = []) => {
+            participants.forEach((participant) => {
+                setRemoteUserName(participant.socketId, participant.name);
+            });
+        });
+
         socket.on("signal", async (data) => {
+            setRemoteUserName(data.from, data.fromName);
             let pc = peerConnections[data.from];
             
             if (!pc) {
@@ -2143,7 +2163,7 @@ body {
 
         socket.on('camera-state', ({ from, isOff }) => {
             remoteCameraOff[from] = !!isOff;
-            setTileCameraState(`tile-${from}`, userNames[from] || 'Remote User', !!isOff);
+            setTileCameraState(`tile-${from}`, userNames[from] || 'Participant', !!isOff);
         });
 
         socket.on('host-control', ({ action, byName }) => {
@@ -2241,7 +2261,7 @@ body {
                 wrapper.id = `tile-${id}`;
                 wrapper.innerHTML = `
                     <video id="video-${id}" autoplay playsinline></video>
-                    <div class="video-label">${escapeHtml(userNames[id] || 'Remote User')}</div>
+                    <div class="video-label">${escapeHtml(userNames[id] || 'Participant')}</div>
                 `;
 
                 if (isHost) {
@@ -2271,7 +2291,7 @@ body {
                 videosContainer.appendChild(wrapper);
             }
             document.getElementById(`video-${id}`).srcObject = stream;
-            setTileCameraState(`tile-${id}`, userNames[id] || 'Remote User', !!remoteCameraOff[id]);
+            setTileCameraState(`tile-${id}`, userNames[id] || 'Participant', !!remoteCameraOff[id]);
             updateGrid();
         }
 

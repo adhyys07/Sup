@@ -2735,8 +2735,24 @@ io.on('connection', (socket) => {
             joinedAt,
             meetingId: meeting?.id || null
         };
-        
-        socket.to(room).emit('user-joined', socket.id, userName);
+
+        const existingParticipants = Array.from(roomBefore || [])
+            .map((socketId) => {
+                const participant = connectedUsers[socketId];
+                if (!participant || participant.room !== room) return null;
+                return {
+                    socketId,
+                    userId: participant.userId,
+                    name: participant.name || 'User'
+                };
+            })
+            .filter(Boolean);
+
+        if (existingParticipants.length > 0) {
+            socket.emit('room-participants', existingParticipants);
+        }
+
+        socket.to(room).emit('user-joined', socket.id, userName || 'User');
         if (typeof ack === 'function') ack({ isHost });
 
         if (meeting) {
@@ -2794,8 +2810,10 @@ io.on('connection', (socket) => {
     });
 
     socket.on('signal', (data) => {
+        const actor = connectedUsers[socket.id];
         io.to(data.to).emit('signal', {
             from: socket.id,
+            fromName: actor?.name || 'User',
             signal: data.signal
         });
     });
