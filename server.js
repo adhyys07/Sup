@@ -9,7 +9,7 @@ import { google } from 'googleapis';
 import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
-import { randomUUID, randomBytes } from 'crypto';
+import { randomUUID, randomBytes, timingSafeEqual, createHash } from 'crypto';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { Strategy as GitHubStrategy } from 'passport-github2';
 import nodemailer from 'nodemailer';
@@ -47,6 +47,8 @@ app.use(cors());
 app.use(express.json());
 app.set('trust proxy', 1);
 app.use(passport.initialize());
+// Password gate for the admin panel HTML pages (defined below; hoisted).
+app.use(adminPanelPageGate);
 app.use(express.static('public', staticAssetOptions));
 
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
@@ -1066,6 +1068,118 @@ async function requireAdmin(req, res, next) {
     }
 }
 
+// ============ ADMIN PANEL PASSWORD GATE ============
+// A shared password that unlocks the admin panel, layered ON TOP of the
+// existing JWT + ADMIN_EMAILS/ADMIN_USER_IDS checks. Set ADMIN_PANEL_PASSWORD
+// (plaintext) or ADMIN_PANEL_PASSWORD_HASH (bcrypt) to enable the panel.
+const ADMIN_GATE_COOKIE = 'admin_gate';
+const ADMIN_GATE_SCOPE = 'admin-panel-gate';
+const ADMIN_GATE_TTL_HOURS = parsePositiveInt(process.env.ADMIN_PANEL_SESSION_HOURS, 8, 168);
+const ADMIN_PANEL_PAGES = new Set(['/admin.html', '/admin-stats.html']);
+
+function adminPanelPasswordConfigured() {
+    return Boolean(process.env.ADMIN_PANEL_PASSWORD_HASH || process.env.ADMIN_PANEL_PASSWORD);
+}
+
+async function verifyAdminPanelPassword(candidate) {
+    if (typeof candidate !== 'string' || candidate.length === 0) return false;
+    const hash = process.env.ADMIN_PANEL_PASSWORD_HASH;
+    if (hash) {
+        try { return await bcrypt.compare(candidate, hash); } catch { return false; }
+    }
+    const plain = process.env.ADMIN_PANEL_PASSWORD;
+    if (!plain) return false;
+    // Constant-time compare over fixed-length digests (avoids length leaks).
+    const a = createHash('sha256').update(candidate).digest();
+    const b = createHash('sha256').update(String(plain)).digest();
+    return timingSafeEqual(a, b);
+}
+
+function issueAdminGateToken() {
+    return jwt.sign({ scope: ADMIN_GATE_SCOPE }, JWT_SECRET, { expiresIn: `${ADMIN_GATE_TTL_HOURS}h` });
+}
+
+function readCookie(req, name) {
+    const header = req.headers.cookie;
+    if (!header) return null;
+    for (const part of header.split(';')) {
+        const idx = part.indexOf('=');
+        if (idx === -1) continue;
+        if (part.slice(0, idx).trim() === name) {
+            return decodeURIComponent(part.slice(idx + 1).trim());
+        }
+    }
+    return null;
+}
+
+function hasAdminGate(req) {
+    const token = readCookie(req, ADMIN_GATE_COOKIE);
+    if (!token) return false;
+    try {
+        return jwt.verify(token, JWT_SECRET)?.scope === ADMIN_GATE_SCOPE;
+    } catch {
+        return false;
+    }
+}
+
+function setAdminGateCookie(res, token) {
+    res.cookie(ADMIN_GATE_COOKIE, token, {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: BASE_URL.startsWith('https'),
+        maxAge: ADMIN_GATE_TTL_HOURS * 60 * 60 * 1000,
+        path: '/'
+    });
+}
+
+// Middleware (hoisted) — gates the admin HTML pages before express.static serves them.
+function adminPanelPageGate(req, res, next) {
+    if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+    if (!ADMIN_PANEL_PAGES.has(req.path)) return next();
+
+    if (!adminPanelPasswordConfigured()) {
+        return res.status(503).type('html').send(
+            '<h1>Admin panel locked</h1><p>Set <code>ADMIN_PANEL_PASSWORD</code> ' +
+            '(or <code>ADMIN_PANEL_PASSWORD_HASH</code>) on the server to enable access.</p>'
+        );
+    }
+    if (hasAdminGate(req)) return next();
+    return res.redirect(302, `/admin-login.html?next=${encodeURIComponent(req.originalUrl)}`);
+}
+
+// Extra layer on the admin API: require the panel password in addition to
+// the JWT + admin-allowlist checks already on each /api/admin/* route.
+function requireAdminGateApi(req, res, next) {
+    if (!adminPanelPasswordConfigured()) {
+        return res.status(503).json({ error: 'Admin panel password not configured' });
+    }
+    if (!hasAdminGate(req)) {
+        return res.status(401).json({ error: 'Admin panel locked', code: 'ADMIN_GATE_REQUIRED' });
+    }
+    next();
+}
+app.use('/api/admin', requireAdminGateApi);
+
+// Unlock / lock endpoints (deliberately NOT under /api/admin so they aren't self-gated).
+app.post('/api/admin-gate/login', authLimiter, async (req, res) => {
+    if (!adminPanelPasswordConfigured()) {
+        return res.status(503).json({ error: 'Admin panel password not configured' });
+    }
+    const ok = await verifyAdminPanelPassword(req.body?.password);
+    if (!ok) return res.status(401).json({ error: 'Incorrect password' });
+    setAdminGateCookie(res, issueAdminGateToken());
+    res.json({ ok: true });
+});
+
+app.post('/api/admin-gate/logout', (req, res) => {
+    res.clearCookie(ADMIN_GATE_COOKIE, { path: '/' });
+    res.json({ ok: true });
+});
+
+app.get('/api/admin-gate/status', (req, res) => {
+    res.json({ configured: adminPanelPasswordConfigured(), unlocked: hasAdminGate(req) });
+});
+
 // ============ AUTH ROUTES ============
 app.post('/api/register', authLimiter, async (req, res) => {
     try {
@@ -1720,13 +1834,13 @@ app.get('/api/admin/stats'  , verifyToken, requireAdmin, async (req, res) => {
             { label: '2h+', min: 120, max: Infinity, count: 0 }
         ];
         for (const row of durationRows) {
-            const m = Number(row.minutes); || 0;
+            const m = Number(row.minutes) || 0;
             const bucket = durationBuckets.find(b => m >= b.min && m < b.max);
             if (bucket) bucket.count += 1;
         }
 
         const one = (rows) => Number(rows?.[0]?.count || 0);
-        const dayKey = (d) => New Date(d).toISOString().slice(0, 10);
+        const dayKey = (d) => new Date(d).toISOString().slice(0, 10);
 
         res.json({
             days,

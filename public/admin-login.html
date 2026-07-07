@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Access — Sup!</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f172a;
+            --surface: #17181b;
+            --surface-2: #1e293b;
+            --border: #1e293b;
+            --border-soft: rgba(255, 255, 255, 0.06);
+            --text: #e9e9e9;
+            --text-2: #9b9ca3;
+            --text-3: #5f6168;
+            --series-1: #3987e5;
+            --bad: #e66767;
+            --radius: 8px;
+            --radius-lg: 12px;
+            --font: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--font);
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .card {
+            width: 100%;
+            max-width: 380px;
+            background: var(--surface);
+            border: 1px solid var(--border-soft);
+            border-radius: var(--radius-lg);
+            padding: 28px 26px 24px;
+        }
+        .brand { font-size: 20px; font-weight: 800; letter-spacing: -.02em; }
+        .brand span { color: var(--text-3); font-weight: 400; }
+        h1 { font-size: 15px; font-weight: 700; margin: 18px 0 4px; }
+        p.sub { font-size: 13px; color: var(--text-2); margin-bottom: 18px; }
+        label { display: block; font-size: 12px; color: var(--text-3); margin-bottom: 6px; font-weight: 600; }
+        input[type="password"] {
+            width: 100%;
+            height: 42px;
+            padding: 0 12px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            color: var(--text);
+            font: 500 14px var(--font);
+            transition: border-color .15s;
+        }
+        input[type="password"]:focus { outline: none; border-color: var(--series-1); }
+        button {
+            width: 100%;
+            height: 42px;
+            margin-top: 16px;
+            background: var(--series-1);
+            border: none;
+            border-radius: var(--radius);
+            color: #fff;
+            font: 700 14px var(--font);
+            cursor: pointer;
+            transition: filter .15s, opacity .15s;
+        }
+        button:hover { filter: brightness(1.08); }
+        button:disabled { opacity: .6; cursor: default; }
+        .msg { font-size: 13px; margin-top: 14px; min-height: 18px; }
+        .msg.error { color: var(--bad); }
+        .foot { margin-top: 18px; font-size: 11px; color: var(--text-3); }
+    </style>
+</head>
+<body>
+    <form class="card" id="form" autocomplete="off">
+        <div class="brand">Sup! <span>· Admin</span></div>
+        <h1>Enter admin password</h1>
+        <p class="sub">This panel is password-protected. Enter the admin password to continue.</p>
+        <label for="pw">Password</label>
+        <input type="password" id="pw" name="password" autofocus autocomplete="current-password" required>
+        <button type="submit" id="submit">Unlock</button>
+        <div class="msg" id="msg" role="alert"></div>
+        <div class="foot">You will still need an authorized admin account to view data.</div>
+    </form>
+    <script>
+        'use strict';
+        // Only allow redirecting back to a local admin page — never an absolute/foreign URL.
+        function safeNext() {
+            const raw = new URLSearchParams(location.search).get('next') || '';
+            try {
+                const decoded = decodeURIComponent(raw);
+                if (/^\/admin[a-z-]*\.html(\?[^#]*)?$/.test(decoded)) return decoded;
+            } catch (_) { /* fall through */ }
+            return '/admin.html';
+        }
+
+        const form = document.getElementById('form');
+        const msg = document.getElementById('msg');
+        const submit = document.getElementById('submit');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            msg.textContent = '';
+            msg.className = 'msg';
+            submit.disabled = true;
+            submit.textContent = 'Checking…';
+            try {
+                const res = await fetch('/api/admin-gate/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: document.getElementById('pw').value })
+                });
+                if (res.ok) {
+                    location.href = safeNext();
+                    return;
+                }
+                const data = await res.json().catch(() => ({}));
+                msg.textContent = res.status === 503
+                    ? 'Admin panel is not configured on the server.'
+                    : (data.error || 'Incorrect password.');
+                msg.className = 'msg error';
+            } catch (_) {
+                msg.textContent = 'Network error — please try again.';
+                msg.className = 'msg error';
+            } finally {
+                submit.disabled = false;
+                submit.textContent = 'Unlock';
+                document.getElementById('pw').select();
+            }
+        });
+    </script>
+</body>
+</html>

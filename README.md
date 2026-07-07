@@ -106,6 +106,16 @@ Admin:
 ```env
 ADMIN_EMAILS=owner@example.com
 ADMIN_USER_IDS=1
+
+# Password gate for the admin panel pages (/admin.html, /admin-stats.html).
+# Layered on top of the ADMIN_EMAILS/ADMIN_USER_IDS checks: a visitor must both
+# know this password AND sign in with an authorized admin account.
+# Set ONE of the following. If neither is set, the admin panel stays locked (503).
+ADMIN_PANEL_PASSWORD=change-this-strong-password
+# ...or a bcrypt hash instead of plaintext (takes precedence if both are set):
+# ADMIN_PANEL_PASSWORD_HASH=$2a$10$...
+# Optional: how long an unlock lasts, in hours (default 8, max 168):
+# ADMIN_PANEL_SESSION_HOURS=8
 ```
 
 ## Scripts
