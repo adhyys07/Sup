@@ -1627,6 +1627,139 @@ app.get('/api/admin/summary', verifyToken, requireAdmin, async (req, res) => {
     }
 });
 
+app.get('/api/admin/stats'  , verifyToken, requireAdmin, async (req, res) => {
+    try {
+        const days = Math.min(Math.max(Number.parseInt(req.query.days, 10) || 30, 1), 365);
+        const now = new Date();
+        const since = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+        const prevSince = new Date(now.getTime() - 2 * days * 86400000);
+
+        const inWindow = (col) => sql`${col} >= ${since}`;
+        const inPrevWindow = (col) => and(sql`${col} >= ${prevSince}`, sql`${col} < ${since}`);
+        const count = () => sql`count(*)::int`;
+
+        const [
+            meetingsPerDay,
+            usersPerDay,
+            messagesPerDay,
+            heatmapRows,
+            topHosts,
+            durationRows,
+            providerRows,
+            reactionRows,
+            userTotalRows,
+            meetingsWindowRows, meetingsPrevRows,
+            usersWindowRows, usersPrevRows,
+            messagesWindowRows, messagesPrevRows,
+            recordingsWindowRows, recordingsPrevRows,
+            activeNowRows 
+        ] = await Promise.all([
+            db.select({
+                day: sql`date_trunc('day', ${meetings.createdAt})`,
+                count: count()}).from(meetings).where(inWindow(meetings.createdAt)).groupBy(sql`1`).orderBy(sql`1`),
+            db.select({
+                day: sql`date_trunc('day', ${users.createdAt})`,
+                count: count()}).from(users).where(inWindow(users.createdAt)).groupBy(sql`1`).orderBy(sql`1`),      
+            
+            db.select({
+                day: sql`date_trunc('day', ${messages.createdAt})`,
+                count: count()}).from(messages).where(inWindow(messages.createdAt)).groupBy(sql`1`).orderBy(sql`1`),    
+            
+            db.select({
+                dow: sql`extract(dow from ${meetings.startedAt})::int`,
+                hour: sql`extract(hour from ${meetings.startedAt})::int`,
+                count: count()
+            }).from(meetings).where(inWindow(meetings.startedAt)).groupBy(sql`1, 2`),
+
+            db.select({ name: users.name, count: count() })
+                .from(meetings)
+                .innerJoin(users, eq(meetings.hostId, users.id))
+                .where(inWindow(meetings.createdAt))
+                .groupBy(users.id, users.name)
+                .orderBy(sql`count(*) desc`)
+                .limit(8),  
+            
+            db.select({ minutes: sql`extract(epoch from (${meetings.endedAt} - ${meetings.startedAt})) / 60` })
+                .from(meetings)
+                .where(and(
+                    sql`${meetings.startedAt} IS NOT NULL`,
+                    sql`${meetings.endedAt} IS NOT NULL`,
+                    inWindow(meetings.startedAt)
+                )),
+
+            // Sign-in method split (all time — it's a population, not a flow)
+            db.select({ provider: users.authProvider, count: count() })
+                .from(users).groupBy(users.authProvider),
+
+            // Top reactions in the window
+            db.select({ emoji: meetingReactions.emoji, count: count() })
+                .from(meetingReactions)
+                .where(inWindow(meetingReactions.createdAt))
+                .groupBy(meetingReactions.emoji)
+                .orderBy(sql`count(*) desc`)
+                .limit(6),
+            
+            db.select({ count: count() }).from(users),
+            db.select({ count: count() }).from(meetings).where(inWindow(meetings.createdAt)),
+            db.select({ count: count() }).from(meetings).where(inPrevWindow(meetings.createdAt)),
+            db.select({ count: count() }).from(users).where(inWindow(users.createdAt)),
+            db.select({ count: count() }).from(users).where(inPrevWindow(users.createdAt)),
+            db.select({ count: count() }).from(messages).where(inWindow(messages.createdAt)),
+            db.select({ count: count() }).from(messages).where(inPrevWindow(messages.createdAt)),
+            db.select({ count: count() }).from(recordings).where(inWindow(recordings.createdAt)),
+            db.select({ count: count() }).from(recordings).where(inPrevWindow(recordings.createdAt)),
+            db.select({ count: count() }).from(meetings)
+                .where(and(sql`${meetings.startedAt} IS NOT NULL`, sql`${meetings.endedAt} IS NULL`))
+        ]);
+
+        const durationBuckets = [
+            { label: '<15m', min: 0, max: 15, count: 0 },
+            { label: '15–30m', min: 15, max: 30, count: 0 },
+            { label: '30–60m', min: 30, max: 60, count: 0 },
+            { label: '1–2h', min: 60, max: 120, count: 0 },
+            { label: '2h+', min: 120, max: Infinity, count: 0 }
+        ];
+        for (const row of durationRows) {
+            const m = Number(row.minutes); || 0;
+            const bucket = durationBuckets.find(b => m >= b.min && m < b.max);
+            if (bucket) bucket.count += 1;
+        }
+
+        const one = (rows) => Number(rows?.[0]?.count || 0);
+        const dayKey = (d) => New Date(d).toISOString().slice(0, 10);
+
+        res.json({
+            days,
+            generatedAt: now.toISOString(),
+            totals: {
+                userTotals: one(userTotalRows),
+                userNew: one(usersWindowRows),
+                userNewPrev: one(usersPrevRows),
+                meetings: one(meetingsWindowRows),
+                meetingsPrev: one(meetingsPrevRows),
+                messages: one(messagesWindowRows),
+                messagesPrev: one(messagesPrevRows),
+                recordings: one(recordingsWindowRows),
+                recordingsPrev: one(recordingsPrevRows),
+                activeNow: one(activeNowRows)
+        },
+        perDay: {
+            meetings: meetingsPerDay.map(r => ({ day: dayKey(r.day), count: r.count })),
+            users: usersPerDay.map(r => ({ day: dayKey(r.day), count: r.count })),
+            messages: messagesPerDay.map(r => ({ day: dayKey(r.day), count: r.count }))
+        },
+        heatmap: heatmapRows,
+        topHosts,
+        durations: durationBuckets.map(({ label, count }) => ({ label, count })),
+        providers: providerRows.map(r => ({ provider: r.provider || 'local', count: r.count })),
+        reactions: reactionRows                      // [{ emoji, count }]
+    });
+    } catch (err) {
+        console.error('Admin stats error:', err);
+        res.status(400).json({ error: err.message });
+    }
+});
+
 app.get('/api/admin/users', verifyToken, requireAdmin, async (req, res) => {
     try {
         const limit = parsePositiveInt(req.query.limit, 50, 100);

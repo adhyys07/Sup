@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics — Sup! Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f172a;
+            --surface: #17181b;
+            --surface-2: #1e293b;
+            --surface-3: #1e293b;
+            --border: #1e293b;
+            --border-soft: rgba(255, 255, 255, 0.05);
+            --text: #e9e9e9;
+            --text-2:    #9b9ca3;   /* secondary ink */
+            --text-3:    #5f6168;   /* muted */
+            --grid:      #26282c;   /* hairline gridline */
+            --baseline:  #383835;
+
+            --series-1:  #3987e5;   /* blue   */
+            --series-2:  #199e70;   /* aqua   */
+            --series-3:  #c98500;   /* yellow */
+            --series-4:  #9085e9;   /* violet */
+            --deemph:    #4a4c52;   /* de-emphasis gray (sparklines) */
+            --good:      #0ca30c;
+            --bad:       #e66767;
+
+            --radius: 8px;
+            --radius-lg: 12px;
+            --font: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+            --mono: 'JetBrains Mono', ui-monospace, monospace;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html{ height: 100%; }
+        body {
+            min-height: 100%;
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--font);
+            font-size: 14px;
+            line-height: 1.5;
+            --webkit-font-smoothing: antialiased;
+
+        }
+
+        .topbar {
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            border-bottom: 1px solid var(--border-soft);
+            position: sticky;
+            top: 0;
+            background: var(--bg);
+            z-index: 20;
+        }
+        .topbar-left { display: flex; align-items: baseline; gap: 10px; }
+        .topbar h1 { font-size: 18px; font-weight: 800; letter-spacing: -.02em; }
+        .topbar h1 span { color: var(--text-3); font-weight: 400; }
+        .topbar-sub { font-size: 12px; color: var(--text-2); }
+        .topbar-right { display: flex; align-items: center; gap: 10px; }
+        .btn {
+            height: 32px;
+            padding: 0 12px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            font: 600 13px var(--font);
+            cursor: pointer;
+            transition: background .15s, color .15s;
+            display: inline-flex; align-items: center; gap: 6px;
+            text-decoration: none;
+        }
+
+        .btn:hover {
+            background: var(--surface-2);
+            color: var(--text-2);
+        }
+
+        .filters {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 14px 20px 0;
+        }
+
+        .filters label {
+            font-size: 12px;
+            color: var(--text-3);
+            margin-right: 4px;
+        }
+
+        .range-btn {
+            height: 30px;
+            padding: 0 14px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text-2);
+            border-radius: 999px;
+            font: 600 12px var(--font);
+            cursor: pointer;
+            transition: background .15s, color .15s, border-color .15s;
+            display: inline-flex; align-items: center; gap: 6px;
+        }
+
+        .range-btn:hover { background: var(--surface-2); color: var(--text); }
+        .range-btn.selected { background: var(--surface-2); color: var(--text); border-color: var(--surface-3); }
+        .range-btn.selected::before { content: '✓'; font-weight: 800; font-size: 12px; }
+        .demo-banner {
+            margin-left: auto;
+            font-size: 12px;
+            color: var(--series-3);
+            display: none;
+        }
+        .demo-banner.on { display: block; }
+
+        .wrap { padding: 16px 20px 40px; max-width: 1240px; margin: 0 auto; }
+        .loading .card, .loading .title { opacity: .5; transition: opacity .2s; }
+
+        .kpis{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .tile {
+            background: var(--surface);
+            border: 1px solid var(--border-soft);
+            border-radius: var(--radius-lg);
+            padding: 14px 16px 12px;
+        }
+        .tile .t-label { font-size: 12px; color: var(--text-2); font-weight: 500; }
+        .tile .t-value { font-size: 28px; font-weight: 700; letter-spacing: -.02em; margin: 2px 0 0; }
+        .tile .t-foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; min-height: 26px; }
+        .tile .t-delta { font-size: 12px; font-weight: 600; }
+        .tile .t-delta.up { color: var(--good); }
+        .tile .t-delta.down { color: var(--bad); }
+        .tile .t-delta.flat { color: var(--text-3); }
+        .tile .t-spark { flex-shrink: 0;}
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 12px;
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border-soft);
+            border-radius: var(--radius-lg);
+            padding: 16px;
+            min-width: 0;
+        }
+        .card-head {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 4px;
+        }
+
+        .card-title { font-size: 13px; font-weight: 700; }
+        .card-sub { font-size: 12px; color: var(--text-3); font-weight: 400; margin-left: 6px; }
+        .view-toggle {
+            background: none;
+            border: none;
+            color: var(--text-3);
+            font: 600 11px var(--font);
+            cursor: pointer;
+            padding: 2px 6px;
+            border-radius: 6px;
+        }
+
+        .view-toggle:hover { background: var(--surface-2); color: var(--text); }
+
+        .legend { display: flex; gap: 14px; margin: 2px 0 6px; }
+        .legend .key { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-2); }
+        .legend .key i { width: 14px; height: 2px; border-radius: 1px; display: inline-block; }
+
+        .chart-box { position: relative; }
+        .chart-box svg { display: block; width: 100%; }
+        svg text { font-family: var(--font); }
+        .tick { font-size: 10px; fill: var(--text-3); font-variant-numeric: tabular-nums; }
+        .end-label { font-size: 11px; fill: var(--text-2); font-weight: 600; }
+
+        .hm-grid { display: grid; gap:2px; }
+        .hm-cell { border-radius: 2px; min-height: 16px; }
+        .hm-cell:hover { outline: 1px solid var(--text-2); outline-offset: 0; }
+        .hm-lab { font-size: 10px; color: var(--text-3); display: flex; align-items: center; }
+        .hm-lab.col { justify-content: center; }
+        .hm-scale { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 11px; color: var(--text-3); }
+        .hm-scale .bar { height: 8px; flex: 0 0 120px; border-radius: 4px; }
+
+        .hbar-row { display: grid; grid-template-columns: 120px 1fr; align-items: center; gap: 10px; margin: 7px 0; }
+        .hbar-name { font-size: 12px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
+        .hbar-track { display: flex; align-items: center; gap: 8px; min-width: 0; }
+        .hbar-fill {
+            height: 18px;                                   /* thin mark ≤24px */
+            background: var(--series-1);
+            border-radius: 0 4px 4px 0;                     /* rounded data-end, square baseline */
+            min-width: 2px;
+            transition: filter .1s;
+        }
+        .hbar-row:hover .hbar-fill { filter: brightness(1.15); }
+        .hbar-val { font-size: 12px; color: var(--text-2); font-weight: 600; flex-shrink: 0; }
+
+        .donut-wrap { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+        .donut-center-val { font-size: 30px; font-weight: 700; letter-spacing: -.02em; fill: var(--text); }
+        .donut-center-lab { font-size: 11px; fill: var(--text-3); }
+        .donut-legend { display: flex; flex-direction: column; gap: 8px; }
+        .donut-legend .row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-2); }
+        .donut-legend .row i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex-shrink: 0; }
+        .donut-legend .row b { color: var(--text); font-weight: 700; margin-left: auto; font-variant-numeric: tabular-nums; }
+        
+        .rx-row { display: grid; grid-template-columns: 34px 1fr; align-items: center; gap: 10px; margin: 7px 0; }
+        .rx-emoji { font-size: 20px; text-align: center; }
+
+        .data-table { width: 100%; border-collapse: collapse; margin-top: 6px; display: none; }
+        .data-table th, .data-table td { text-align: left; padding: 6px 10px; font-size: 12px; border-bottom: 1px solid var(--border-soft); }
+        .data-table th { color: var(--text-3); font-weight: 600; }
+        .data-table td { color: var(--text-2); font-variant-numeric: tabular-nums; }
+        .data-table td:first-child { color: var(--text); }
+        .card.table-view .chart-area { display: none; }
+        .card.table-view .data-table { display: table; }
+
+        #tip{
+             position: fixed;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 8px 10px;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 100;
+            display: none;
+            box-shadow: 0 8px 24px rgba(0,0,0,.5);
+            max-width: 240px;
+        }
+
+        .error-state b { color: var(--text); display: block; font-size: 16px; margin-bottom: 6px; }
+
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <div class="topbar-left">
+            <h1>Sup! <span>· Admin analytics</span></h1>
+            <span class="topbar-sub" id="updatedAt"></span>
+        </div>
+        <div class="topbar-right">
+            <a class="btn" href="/admin.html">Admin Boi</a>
+            <button class="btn" onclick="load()">Refresh</button>
+        </div>
+    </div>
+    <div class="filters">
+        <span class="label">Range</span>
+        <button class="range-btn" data-days="7"  onclick="setRange(7)">Last 7 days</button>
+        <button class="range-btn selected" data-days="30" onclick="setRange(30)">Last 30 days</button>
+        <button class="range-btn" data-days="90" onclick="setRange(90)">Last 90 days</button>
+        <span class="demo-banner" id="demoBanner">Showing demo data — stats API unreachable</span>
+    </div>
+    <div class="wrap" id="wrap">
+        <div class="kpis" id="kpis"></div>
+            <div class="grid">
+                <div class="card span-8" id="card-trend">
+                    <div class="card-head">
+                        <div><span class="card-title">Activity over time</span><span class="card-sub">per day</span></div>
+                    <button class="view-toggle" onclick="toggleTable('card-trend')">table</button>
+                    </div>
+                    <div class="legend">
+                        <span class="key"><i style="background:var(--series-1)"></i>Meetings</span>
+                        <span class="key"><i style="background:var(--series-2)"></i>New users</span>
+                </div>
+                <div class="chart-area"><div class="chart-box" id="trendChart"></div></div>
+                    <table class="data-table" id="trendTable"></table>
+                </div>
+                <div class="card span-4" id="card-providers">
+                    <div class="card-head">
+                        <div><span class="card-title">Sign-in methods</span><span class="card-sub">all users</span></div>
+                    <button class="view-toggle" onclick="toggleTable('card-providers')">table</button>
+                </div>
+                <div class="chart-area"><div class="donut-wrap" id="providerDonut"></div></div>
+                <table class="data-table" id="providerTable"></table>
+                    </div>
+                <div class="card span-7" id="card-heatmap">
+                <div class="card-head">
+                    <div><span class="card-title">When meetings start</span><span class="card-sub">day × hour (server time)</span></div>
+                    <button class="view-toggle" onclick="toggleTable('card-heatmap')">table</button>
+                </div>
+                <div class="chart-area" id="heatmapArea"></div>
+                <table class="data-table" id="heatmapTable"></table>
+            </div>
+
+            <!-- Histogram: meeting length -->
+            <div class="card span-5" id="card-durations">
+                <div class="card-head">
+                    <div><span class="card-title">Meeting length</span><span class="card-sub">completed meetings</span></div>
+                    <button class="view-toggle" onclick="toggleTable('card-durations')">table</button>
+                </div>
+                <div class="chart-area"><div class="chart-box" id="durationChart"></div></div>
+                <table class="data-table" id="durationTable"></table>
+            </div>
+
+            <!-- Top hosts -->
+            <div class="card span-6" id="card-hosts">
+                <div class="card-head">
+                    <div><span class="card-title">Most active hosts</span><span class="card-sub">meetings created</span></div>
+                    <button class="view-toggle" onclick="toggleTable('card-hosts')">table</button>
+                </div>
+                <div class="chart-area" id="hostBars"></div>
+                <table class="data-table" id="hostTable"></table>
+            </div>
+
+            <!-- Reactions -->
+            <div class="card span-6" id="card-reactions">
+                <div class="card-head">
+                    <div><span class="card-title">Top reactions</span><span class="card-sub">in meetings</span></div>
+                    <button class="view-toggle" onclick="toggleTable('card-reactions')">table</button>
+                </div>
+                <div class="chart-area" id="reactionBars"></div>
+                <table class="data-table" id="reactionTable"></table>
+            </div>
+        </div>
+    </div>
+
+    <div id="tip"></div>
+    <script>
+        'use strict';
+        const token = localStorage.getItem('token');
+        if (!token) location.href = '/';
+
+        let days = 30;
+        let state = null;
+
+        const S1 = '#3987e5', S2 = '#199e70', S3 = '#c98500', S4 = '#9085e9';
+        const SURFACE = '#17181b'
+        const RAMP = ['#1c2634', '#0d366b', '#104281', '#1c5cab', '#256abf', '#3987e5', '#6da7ec', '#9ec5f4', '#cde2fb'];
+        const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+        const fmt = (n) => n >= 1e6 ? (n / 1e6).toFixed(1) + 'M'
+                     : n >= 1e4 ? Math.round(n / 1e3) + 'K'
+                     : n >= 1e3 ? (n / 1e3).toFixed(1) + 'K'
+                     : String(n);
+        const el = (tag, cls) => { const e = document.createElement(tag); if (cls) e.className = cls; return e; };
+
+        const tip = document.getElementById('tip');
+        function showTip(x,y,title,rows) {
+            tip.textContent = '';
+            if (title) { const t = el('div', 'tt-title'); t.textContent = title; tip.appendChild(t); }
+            for (const r of rows) {
+                const row = el('div', 'tt-row');
+                const key = el('i'); key.style.background = r.color || 'transparent';
+                if (!r.color) key.style.display = 'none';
+                const val = el('b'); val.textContent = r.value;
+                const lab = el('span'); lab.textContent = r.label;
+                row.append(key, val, lab);
+                tip.appendChild(row);
+        }
+        tip.style.display = 'block';
+        const w = tip.offsetWidth, h = tip.offsetHeight;
+        tip.style.left = Math.min(x + 14, innerWidth - w - 8) + 'px';
+        tip.style.top = Math.max(8, Math.min(y - h - 12, innerHeight - h - 8)) + 'px';
+        }
+        const hideTip = () => { tip.style.display = 'none'};
+
+         function toggleTable(cardId) {
+        document.getElementById(cardId).classList.toggle('table-view');
+        }
+        function fillTable(id, headers, rows) {
+            const t = document.getElementById(id);
+            t.textContent = '';
+            const tr = el('tr');
+            headers.forEach(h => { const th = el('th'); th.textContent = h; tr.appendChild(th); });
+            t.appendChild(tr);
+            rows.forEach(r => {
+                const row = el('tr');
+                r.forEach(c => { const td = el('td'); td.textContent = c; row.appendChild(td); });
+                t.appendChild(row);
+            });
+        }
+
+        function setRange(d) {
+            days = d;
+            document.querySelectorAll('.range-btn').forEach(b => b.classList.toggle('selected', Number(b.dataset.days) === d));
+            load();
+        }
+
+        async function load() {
+            document.getElementById('wrap').classList.add('loading');   // keep frame, dim
+            try {
+                const res = await fetch(`/api/admin/stats?days=${days}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.status === 401 || res.status === 403) { renderDenied(); return; }
+                if (!res.ok) throw new  Error('bad status ' + res.status);
+                state = await res.json();
+                document.getElementById('demoBanner').classList.remove('on');
+            } catch (err) {
+                    console.warn('Stats API unreachable, using demo data:', err.message);
+                    state = demoData(days);
+                    document.getElementById('demoBanner').classList.add('on');
+
+            }
+            renderAll();
+            document.getElementById('wrap').classList.remove('loading');
+            document.getElementById('updatedAt').textContent = 'updated: ' + new Date().toLocaleString([] , {hour : '2-digit', minute: '2-digit', second: '2-digit'});
+            
+        }
+
+        function renderDenied() {
+            document.getElementById('wrap').innerHTML = '<div class = "error-state"><b>Access denied</b> You do not have permission to view this page.</div>';
+        }
+
+        function daySeries(rows){
+            const start = new Date(Date.now() - (days - 1) * 86400000);
+            start.setHours(0, 0, 0, 0);
+            const map = Object.fromEntries((rows || []).map(r => [r.date, r.count]));
+            const out = [];
+            for (let i = 0; i < days; i++) {
+                const d = new Date(start.getTime() + i * 86400000);
+                const key = d.toISOString().slice(0, 10);
+                out.push({ date: key, count: map[key] || 0 });
+            }
+            return out;
+        }
+
+        function renderAll() {
+            renderKpis();
+            renderTrend();
+            renderProviders();
+            renderHeatmap();
+            renderDurations();
+            renderHosts();
+            renderReactions();
+        }
+
+        function spark(values, w=84, h=26){
+            const max = Math.max(...values, 1);
+            const step = w / Math.max(values.length - 1, 1);
+            const pts = values.map((v, i) => `${(i * step).toFixed(1)},${(h - 2 - (v / max) * (h - 4)).toFixed(1)}`);
+            const last = pts[pts.length - 1].split(',');
+            return `<svg class="t-spark" width="${w}" height="${h}" aria-hidden="true">
+                <polyline points="${pts.join(' ')}" fill="none" stroke="#4a4c52" stroke-width="1.5"/>
+                <circle cx="${last[0]}" cy="${last[1]}" r="2.5" fill="${S1}"/></svg>`;
+        }
+
+        function delta(cur, prev){
+            if (!prev && !cur) return '<span class="t-delta flat">--</span>';
+            if (!prev) return `<span class="t-delta up">new</span>`;
+            const pct = Math.round((cur - prev) / prev * 100);
+            const cls = pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat';
+            const sign = pct > 0 ? '+' : '';
+            return `<span class="t-delta ${cls}">${sign}${pct}% vs prev ${state.days}d</span>`;
+ 
+        }
+
+        function renderKpis() {
+            const t = state.totals;
+            const mSeries = daySeries(state.perDay.meetings).map(d => d.count);
+            const uSeries = daySeries(state.perDay.users).map(d => d.count);
+            const cSeries = daySeries(state.perDay.messages).map(d => d.count);
+            const tiles = [
+                 { label: 'Total users', value: t.usersTotal, delta: delta(t.usersNew, t.usersNewPrev), spark: spark(uSeries) },
+                { label: `Meetings · ${state.days}d`, value: t.meetings, delta: delta(t.meetings, t.meetingsPrev), spark: spark(mSeries) },
+                { label: 'Live right now', value: t.activeNow, delta: '<span class="t-delta flat">active meetings</span>', spark: '' },
+                { label: `Messages · ${state.days}d`, value: t.messages, delta: delta(t.messages, t.messagesPrev), spark: spark(cSeries) },
+                { label: `Recordings · ${state.days}d`, value: t.recordings, delta: delta(t.recordings, t.recordingsPrev), spark: '' }
+            ];
+            document.getElementById('kpis').innerHTML = tiles.map(x => `
+                <div class="tile">
+                    <div class="t-label">${x.label}</div>
+                    <div class="t-value">${fmt(x.value)}</div>
+                    <div class="t-foot">${x.delta}${x.spark}</div>
+                </div>
+            `).join('');
+        }
+
+        function renderTrend() {
+            const A = daySeries(state.perDay.meetings);
+            const B = daySeries(state.perDay.users);
+            const box = document.getElementById('trendChart');
+            const W = Math.max(box.clientWidth || 640, 320), H = 240;
+            const P = { l: 34, r: 64, t: 10, b: 24 };
+            const iw = W - P.l - P.r, ih = H - P.t - P.b;
+            const max = Math.max(...A.map(d => d.count), ...B.map(d => d.count), 4);
+            const yMax = Math.ceil(max / 4) * 4;
+            const x = i => P.l + (i / Math.max(A.length - 1, 1)) * iw;
+            const y = v => P.t + ih - (v / yMax) * ih;
+            const path = s => s.map((d, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(d.count).toFixed(1)}`).join('');
+
+            const ticks = [0, yMax / 2, yMax];
+            const tickEls = ticks.map(v =>
+                `<line x1="${P.l}" x2="${W - P.r}" y1="${y(v)}" y2="${y(v)}" stroke="#26282c" stroke-width="1"/>
+                <text class="tick" x="${P.l - 6}" y="${y(v) + 3}" text-anchor="end">${fmt(v)}</text>`).join('');
+            const xLabs = [0, Math.floor(A.length / 2), A.length - 1].map(i =>
+                `<text class="tick" x="${x(i)}" y="${H - 6}" text-anchor="middle">${A[i].date.slice(5)}</text>`).join('');
+
+            const lastA = A[A.length - 1], lastB = B[B.length - 1];
+            box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Meetings and new users per day">
+                ${tickEls}
+                <path d="${path(A)}" fill="none" stroke="${S1}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+                <path d="${path(B)}" fill="none" stroke="${S2}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+                <circle cx="${x(A.length - 1).toFixed(1)}" cy="${y(lastA.count).toFixed(1)}" r="3" fill="${S1}"/>
+                <circle cx="${x(B.length - 1).toFixed(1)}" cy="${y(lastB.count).toFixed(1)}" r="3" fill="${S2}"/>
+                <text class="end-label" x="${(x(A.length - 1) + 6).toFixed(1)}" y="${(y(lastA.count) + 4).toFixed(1)}" fill="${S1}">${fmt(lastA.count)}</text>
+                <text class="end-label" x="${(x(B.length - 1) + 6).toFixed(1)}" y="${(y(lastB.count) + 4).toFixed(1)}" fill="${S2}">${fmt(lastB.count)}</text>
+                ${xLabs}
+            </svg>`;
+            fillTable('trendTable', ['Date', 'Meetings', 'New users'], A.map((d, i) => [d.date, d.count, B[i].count]));
+        }
+
+        function renderProviders() {
+            const data = state.providers || [];
+            const total = data.reduce((s, d) => s + d.count, 0) || 1;
+            const colors = [S1, S2, S3, S4, '#4a4c52'];
+            const R = 52, C = 2 * Math.PI * R, cx = 70, cy = 70;
+            let off = 0;
+            const arcs = data.map((d, i) => {
+                const frac = d.count / total;
+                const seg = `<circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="${colors[i % colors.length]}"
+                    stroke-width="16" stroke-dasharray="${(frac * C).toFixed(2)} ${(C - frac * C).toFixed(2)}"
+                    stroke-dashoffset="${(-off * C).toFixed(2)}" transform="rotate(-90 ${cx} ${cy})"/>`;
+                off += frac;
+                return seg;
+            }).join('');
+            const legend = data.map((d, i) =>
+                `<div class="row"><i style="background:${colors[i % colors.length]}"></i>${d.name}<b>${Math.round(d.count / total * 100)}%</b></div>`).join('');
+            document.getElementById('providerDonut').innerHTML = `
+                <svg width="140" height="140" viewBox="0 0 140 140" role="img" aria-label="Sign-in methods">
+                    ${arcs}
+                    <text class="donut-center-val" x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central">${fmt(total)}</text>
+                    <text class="donut-center-lab" x="${cx}" y="${cy + 22}" text-anchor="middle">users</text>
+                </svg>
+                <div class="donut-legend">${legend}</div>`;
+            fillTable('providerTable', ['Method', 'Users', 'Share'],
+                data.map(d => [d.name, d.count, Math.round(d.count / total * 100) + '%']));
+        }
+
+        function renderHeatmap() {
+            const area = document.getElementById('heatmapArea');
+            const hm = state.heatmap || [];
+            let max = 1;
+            hm.forEach(r => r.forEach(v => { if (v > max) max = v; }));
+            const color = v => v === 0 ? 'var(--surface-2)'
+                : RAMP[Math.min(RAMP.length - 1, 1 + Math.floor(v / max * (RAMP.length - 2)))];
+            const hourLab = h => h === 0 ? '12a' : h === 6 ? '6a' : h === 12 ? '12p' : h === 18 ? '6p' : '';
+            let cells = '<div class="hm-lab"></div>';
+            for (let h = 0; h < 24; h++) cells += `<div class="hm-lab col">${hourLab(h)}</div>`;
+            hm.forEach((row, d) => {
+                cells += `<div class="hm-lab">${DOW[d]}</div>`;
+                row.forEach((v, h) => {
+                    cells += `<div class="hm-cell" style="background:${color(v)}"
+                        onmousemove="showTip(event.clientX, event.clientY, '${DOW[d]} ${h}:00', [{value:${v}, label:'meetings'}])"
+                        onmouseleave="hideTip()"></div>`;
+                });
+            });
+            area.innerHTML = `<div class="hm-grid" style="grid-template-columns:28px repeat(24, 1fr)">${cells}</div>
+                <div class="hm-scale"><span>less</span>
+                    <div class="bar" style="background:linear-gradient(90deg, ${RAMP.slice(1).join(', ')})"></div>
+                    <span>more</span></div>`;
+            fillTable('heatmapTable', ['Day', 'Meetings'],
+                hm.map((row, d) => [DOW[d], row.reduce((s, v) => s + v, 0)]));
+        }
+
+        function renderDurations() {
+            const box = document.getElementById('durationChart');
+            const data = state.durations || [];
+            const W = Math.max(box.clientWidth || 400, 280), H = 200;
+            const P = { l: 30, r: 10, t: 10, b: 28 };
+            const iw = W - P.l - P.r, ih = H - P.t - P.b;
+            const max = Math.max(...data.map(d => d.count), 1);
+            const yMax = Math.ceil(max / 4) * 4;
+            const bw = iw / Math.max(data.length, 1);
+            const y = v => P.t + ih - (v / yMax) * ih;
+            const ticks = [0, yMax / 2, yMax].map(v =>
+                `<line x1="${P.l}" x2="${W - P.r}" y1="${y(v)}" y2="${y(v)}" stroke="#26282c" stroke-width="1"/>
+                <text class="tick" x="${P.l - 6}" y="${y(v) + 3}" text-anchor="end">${fmt(v)}</text>`).join('');
+            const bars = data.map((d, i) => {
+                const bx = P.l + i * bw + bw * 0.15;
+                const by = y(d.count);
+                const bh = Math.max(P.t + ih - by, 0);
+                return `<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${(bw * 0.7).toFixed(1)}" height="${bh.toFixed(1)}" rx="3" fill="${S1}"
+                    onmousemove="showTip(event.clientX, event.clientY, '${d.label}', [{value:${d.count}, label:'meetings'}])"
+                    onmouseleave="hideTip()"/>
+                    <text class="tick" x="${(P.l + i * bw + bw / 2).toFixed(1)}" y="${H - 9}" text-anchor="middle">${d.label}</text>`;
+            }).join('');
+            box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Meeting length distribution">${ticks}${bars}</svg>`;
+            fillTable('durationTable', ['Length', 'Meetings'], data.map(d => [d.label, d.count]));
+        }
+
+        function renderHosts() {
+            const wrap = document.getElementById('hostBars');
+            const data = state.hosts || [];
+            const max = Math.max(...data.map(d => d.count), 1);
+            wrap.innerHTML = data.map(d => `
+                <div class="hbar-row">
+                    <div class="hbar-name" title="${d.name}">${d.name}</div>
+                    <div class="hbar-track">
+                        <div class="hbar-fill" style="width:${(d.count / max * 100).toFixed(1)}%"></div>
+                        <div class="hbar-val">${fmt(d.count)}</div>
+                    </div>
+                </div>`).join('');
+            fillTable('hostTable', ['Host', 'Meetings'], data.map(d => [d.name, d.count]));
+        }
+
+        function renderReactions() {
+            const wrap = document.getElementById('reactionBars');
+            const data = state.reactions || [];
+            const max = Math.max(...data.map(d => d.count), 1);
+            wrap.innerHTML = data.map(d => `
+                <div class="rx-row">
+                    <div class="rx-emoji">${d.emoji}</div>
+                    <div class="hbar-track">
+                        <div class="hbar-fill" style="width:${(d.count / max * 100).toFixed(1)}%; background:var(--series-4)"></div>
+                        <div class="hbar-val">${fmt(d.count)}</div>
+                    </div>
+                </div>`).join('');
+            fillTable('reactionTable', ['Reaction', 'Count'], data.map(d => [d.emoji, d.count]));
+        }
+
+        function demoData(days) {
+            const series = (peak) => {
+                const start = new Date(Date.now() - (days - 1) * 86400000);
+                const out = [];
+                for (let i = 0; i < days; i++) {
+                    const d = new Date(start.getTime() + i * 86400000);
+                    const wk = (d.getDay() === 0 || d.getDay() === 6) ? 0.5 : 1;
+                    const base = peak * wk;
+                    out.push({ date: d.toISOString().slice(0, 10), count: Math.max(0, Math.round(base * (0.6 + 0.4 * Math.sin(i / 3)) + Math.random() * base * 0.3)) });
+                }
+                return out;
+            };
+            const meetings = series(40), users = series(12), messages = series(300);
+            const sum = a => a.reduce((s, d) => s + d.count, 0);
+            const heatmap = DOW.map((_, d) => Array.from({ length: 24 }, (_, h) => {
+                const work = (h >= 9 && h <= 17) ? 1 : (h >= 18 && h <= 21) ? 0.5 : 0.1;
+                const wk = (d === 0 || d === 6) ? 0.4 : 1;
+                return Math.round(Math.random() * 14 * work * wk);
+            }));
+            return {
+                days,
+                totals: {
+                    usersTotal: 4820, usersNew: sum(users), usersNewPrev: Math.round(sum(users) * 0.85),
+                    meetings: sum(meetings), meetingsPrev: Math.round(sum(meetings) * 1.08),
+                    activeNow: 7,
+                    messages: sum(messages), messagesPrev: Math.round(sum(messages) * 0.92),
+                    recordings: 214, recordingsPrev: 190
+                },
+                perDay: { meetings, users, messages },
+                providers: [
+                    { name: 'Google', count: 2600 },
+                    { name: 'Email', count: 1300 },
+                    { name: 'GitHub', count: 640 },
+                    { name: 'Apple', count: 280 }
+                ],
+                heatmap,
+                durations: [
+                    { label: '0–5m', count: 120 }, { label: '5–15m', count: 340 }, { label: '15–30m', count: 410 },
+                    { label: '30–60m', count: 520 }, { label: '1–2h', count: 230 }, { label: '2h+', count: 70 }
+                ],
+                hosts: [
+                    { name: 'alex@sup.io', count: 82 }, { name: 'jordan@sup.io', count: 64 }, { name: 'sam@acme.co', count: 51 },
+                    { name: 'priya@sup.io', count: 44 }, { name: 'lee@acme.co', count: 37 }
+                ],
+                reactions: [
+                    { emoji: '👍', count: 1420 }, { emoji: '😂', count: 980 }, { emoji: '❤️', count: 640 },
+                    { emoji: '🎉', count: 420 }, { emoji: '🔥', count: 280 }, { emoji: '👏', count: 190 }
+                ]
+            };
+        }
+
+        let resizeTimer;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => { if (state) renderAll(); }, 150);
+        });
+
+        load();
+    </script>
+</body>
+</html>
